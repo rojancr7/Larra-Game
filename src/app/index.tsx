@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -13,7 +14,7 @@ import {
 import { triggerHaptic } from "../services/audioHaptics";
 import { restorePortraitOrientation } from "../services/orientation";
 import { loadSettings, saveSettings } from "../services/storage";
-import { C, serif, shared } from '../theme/appTheme';
+import { C, serif, shared } from "../theme/appTheme";
 
 type Difficulty = "easy" | "med" | "hard";
 
@@ -28,18 +29,20 @@ const RULES = [
     "1. Partitioning (3-3-3-4)",
     "Divide your 13 cards into 4 sequential rounds before playing.",
   ],
+  ["2. In every Round Won get 1 point."],
   [
-    "2. Scoring",
+    "3. Scoring",
     "Round 1 = 1 PT (5 PTS if Clean Sweep), Round 2 = 1 PT, Round 3 = 1 PT, Round 4 = 5 PTS.",
   ],
   [
-    "3. Real Larra",
+    "4. Real Larra",
     "In Round 4, a 4-card suit flush beats any 3-card suit combination.",
   ],
   [
-    "4. Instant hand declarations",
-    "6 Jute = +6 PTS, 3 Trayel = +9 PTS, No Jute = +13 PTS.",
+    "6. Instant hand declarations",
+    "7 Jute = +6 PTS, 3 Trayel = +9 PTS, No Jute = +13 PTS.",
   ],
+  ["8. Your Main goal to achive or hit 20 point first befor hiting other."],
 ];
 
 export default function HomeScreen() {
@@ -277,11 +280,21 @@ export default function HomeScreen() {
         <View style={styles.backdrop}>
           <View style={styles.sheet}>
             <View style={styles.sheetHead}>
-              <Text style={styles.sheetTitle}>🎴 Larra game rules</Text>
+              {/* Left side: Icon + Title */}
+              <View style={styles.titleWrapper}>
+                <Image
+                  source={require("../../assets/images/logo.jpg")} // Update path to your image
+                  style={styles.inlineIcon}
+                />
+                <Text style={styles.sheetTitle}>Larra game rules</Text>
+              </View>
+
+              {/* Right side: Close button */}
               <Pressable onPress={() => setRulesOpen(false)} hitSlop={10}>
                 <Text style={styles.close}>✕</Text>
               </Pressable>
             </View>
+
             <ScrollView style={{ maxHeight: 340 }}>
               {RULES.map(([title, body]) => (
                 <Text key={title} style={styles.rule}>
@@ -295,6 +308,7 @@ export default function HomeScreen() {
                 5. Target victory: the first player to reach 20 PTS wins.
               </Text>
             </ScrollView>
+
             <Pressable
               style={[styles.cta, { backgroundColor: C.amber, marginTop: 12 }]}
               onPress={() => setRulesOpen(false)}
@@ -446,6 +460,14 @@ const styles = StyleSheet.create({
     borderBottomColor: C.border,
     paddingBottom: 12,
     marginBottom: 12,
+  },
+  titleWrapper: { flexDirection: "row", alignItems: "center", gap: 8 },
+  inlineIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: "cover",
+    borderRadius: 14,
+    overflow: "hidden",
   },
   sheetTitle: {
     color: C.amber,
