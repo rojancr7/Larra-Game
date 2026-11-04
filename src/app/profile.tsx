@@ -1,5 +1,6 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
+
 import {
   Pressable,
   ScrollView,
@@ -8,31 +9,39 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { C, shared } from "./theme";
-import { triggerHaptic } from "../services/audioHaptics";
+
+import { triggerHaptic } from "../../src/services/audioHaptics";
+import { C, shared } from '../theme/appTheme';
+
 import {
   AVATAR_PRESETS,
   DEFAULT_PROFILE,
   loadProfile,
-  PlayerProfile,
   saveProfile,
-} from "../services/storage";
+} from "../../src/services/storage";
+
+import type { PlayerProfile } from "../../src/services/storage";
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<PlayerProfile>(DEFAULT_PROFILE);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [saved, setSaved] = useState(false);
+
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Load profile whenever this screen becomes active
   useFocusEffect(
     useCallback(() => {
       let active = true;
+
       loadProfile().then((p) => {
         if (!active) return;
+
         setProfile(p);
         setNameInput(p.name);
       });
+
       return () => {
         active = false;
         setEditingName(false);
@@ -40,26 +49,39 @@ export default function ProfileScreen() {
     }, []),
   );
 
+  // Show saved message
   const flashSaved = () => {
     setSaved(true);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setSaved(false), 1500);
+
+    if (timer.current) {
+      clearTimeout(timer.current);
+    }
+
+    timer.current = setTimeout(() => {
+      setSaved(false);
+    }, 1500);
   };
 
+  // Update and save profile
   const update = (patch: Partial<PlayerProfile>) => {
     const next = { ...profile, ...patch };
+
     setProfile(next);
     saveProfile(next);
     flashSaved();
   };
 
+  // Calculate win rate
   const winRate =
     profile.matchesPlayed > 0
       ? Math.round((profile.matchesWon / profile.matchesPlayed) * 100)
       : 0;
+
+  // Selected avatar
   const avatar =
     AVATAR_PRESETS.find((a) => a.id === profile.avatar) || AVATAR_PRESETS[0];
 
+  // Player statistics
   const stats = [
     {
       label: "Win rate",
@@ -87,7 +109,7 @@ export default function ProfileScreen() {
     },
   ];
 
-  // Badges are earned from real stats
+  // Badges earned from player statistics
   const badges = [
     {
       icon: "🎴",
@@ -118,15 +140,17 @@ export default function ProfileScreen() {
       contentContainerStyle={shared.content}
       keyboardShouldPersistTaps="handled"
     >
+      {/* Header */}
       <View style={styles.headRow}>
         <View>
           <Text style={shared.pageTitle}>Player profile</Text>
           <Text style={shared.pageSub}>Saved on this device</Text>
         </View>
+
         {saved && <Text style={styles.saved}>Saved ✓</Text>}
       </View>
 
-      {/* Header card */}
+      {/* Profile card */}
       <View style={[shared.card, styles.hero]}>
         <View
           style={[styles.bigAvatar, { backgroundColor: avatar.color + "33" }]}
@@ -136,6 +160,7 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
+        {/* Edit player name */}
         {editingName ? (
           <View style={styles.editRow}>
             <TextInput
@@ -144,12 +169,19 @@ export default function ProfileScreen() {
               onChangeText={setNameInput}
               maxLength={20}
               autoFocus
+              placeholder="Player name"
+              placeholderTextColor={C.muted}
             />
+
             <Pressable
               style={styles.saveBtn}
               onPress={() => {
                 triggerHaptic("selection");
-                update({ name: nameInput.trim() || "Player 1" });
+
+                update({
+                  name: nameInput.trim() || "Player 1",
+                });
+
                 setEditingName(false);
               }}
             >
@@ -159,7 +191,10 @@ export default function ProfileScreen() {
         ) : (
           <Pressable
             style={styles.nameRow}
-            onPress={() => setEditingName(true)}
+            onPress={() => {
+              setNameInput(profile.name);
+              setEditingName(true);
+            }}
           >
             <Text style={styles.name}>{profile.name}</Text>
             <Text>✏️</Text>
@@ -169,7 +204,7 @@ export default function ProfileScreen() {
         <Text style={styles.id}>ID {profile.playerId}</Text>
       </View>
 
-      {/* Stats */}
+      {/* Statistics */}
       <View style={styles.grid}>
         {stats.map((s) => (
           <View
@@ -177,7 +212,9 @@ export default function ProfileScreen() {
             style={[shared.card, styles.stat, { borderLeftColor: s.color }]}
           >
             <Text style={styles.statLabel}>{s.label}</Text>
+
             <Text style={styles.statValue}>{s.value}</Text>
+
             <Text style={[styles.statSub, { color: s.color }]}>{s.sub}</Text>
           </View>
         ))}
@@ -186,6 +223,7 @@ export default function ProfileScreen() {
       {/* Badges */}
       <View style={shared.card}>
         <Text style={styles.sectionTitle}>🏅 Trophies & badges</Text>
+
         <View style={{ gap: 10 }}>
           {badges.map((b) => (
             <View
@@ -195,8 +233,10 @@ export default function ProfileScreen() {
               <View style={[styles.badgeIcon, { backgroundColor: b.tint }]}>
                 <Text style={{ fontSize: 18 }}>{b.icon}</Text>
               </View>
+
               <View style={{ flex: 1 }}>
                 <Text style={styles.badgeTitle}>{b.title}</Text>
+
                 <Text style={styles.badgeDesc}>
                   {b.earned ? b.desc : `Locked · ${b.desc}`}
                 </Text>
@@ -209,9 +249,11 @@ export default function ProfileScreen() {
       {/* Avatar picker */}
       <View style={shared.card}>
         <Text style={styles.sectionTitle}>👑 Choose avatar</Text>
+
         <View style={styles.avatarGrid}>
           {AVATAR_PRESETS.map((av) => {
             const active = profile.avatar === av.id;
+
             return (
               <Pressable
                 key={av.id}
@@ -222,6 +264,7 @@ export default function ProfileScreen() {
                 }}
               >
                 <Text style={{ fontSize: 22 }}>{av.label.split(" ")[0]}</Text>
+
                 <Text style={styles.avatarLabel}>{av.label.split(" ")[1]}</Text>
               </Pressable>
             );
@@ -232,14 +275,26 @@ export default function ProfileScreen() {
   );
 }
 
+// Profile screen styles
 const styles = StyleSheet.create({
   headRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  saved: { color: C.emerald, fontSize: 12, fontWeight: "800" },
-  hero: { alignItems: "center", gap: 8, paddingVertical: 22 },
+
+  saved: {
+    color: C.emerald,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  hero: {
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 22,
+  },
+
   bigAvatar: {
     width: 80,
     height: 80,
@@ -249,10 +304,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  bigAvatarEmoji: { fontSize: 40 },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  name: { color: C.white, fontSize: 20, fontWeight: "800" },
-  editRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+
+  bigAvatarEmoji: {
+    fontSize: 40,
+  },
+
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  name: {
+    color: C.white,
+    fontSize: 20,
+    fontWeight: "800",
+  },
+
+  editRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
   nameInput: {
     backgroundColor: C.bg,
     borderColor: C.amber,
@@ -266,20 +340,55 @@ const styles = StyleSheet.create({
     minWidth: 150,
     textAlign: "center",
   },
+
   saveBtn: {
     backgroundColor: C.amber,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 9,
   },
-  saveBtnText: { color: C.bg, fontSize: 12, fontWeight: "800" },
-  id: { color: C.muted, fontSize: 11, fontFamily: "monospace" },
 
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  stat: { width: "47.5%", flexGrow: 1, borderLeftWidth: 4, padding: 14 },
-  statLabel: { color: C.muted, fontSize: 12 },
-  statValue: { color: C.white, fontSize: 22, fontWeight: "800", marginTop: 4 },
-  statSub: { fontSize: 10, marginTop: 2 },
+  saveBtnText: {
+    color: C.bg,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  id: {
+    color: C.muted,
+    fontSize: 11,
+    fontFamily: "monospace",
+  },
+
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  stat: {
+    width: "47.5%",
+    flexGrow: 1,
+    borderLeftWidth: 4,
+    padding: 14,
+  },
+
+  statLabel: {
+    color: C.muted,
+    fontSize: 12,
+  },
+
+  statValue: {
+    color: C.white,
+    fontSize: 22,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+
+  statSub: {
+    fontSize: 10,
+    marginTop: 2,
+  },
 
   sectionTitle: {
     color: C.white,
@@ -287,6 +396,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginBottom: 12,
   },
+
   badge: {
     flexDirection: "row",
     alignItems: "center",
@@ -297,6 +407,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
   },
+
   badgeIcon: {
     width: 40,
     height: 40,
@@ -304,10 +415,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  badgeTitle: { color: C.white, fontSize: 13, fontWeight: "800" },
-  badgeDesc: { color: C.muted, fontSize: 11, marginTop: 1 },
 
-  avatarGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  badgeTitle: {
+    color: C.white,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  badgeDesc: {
+    color: C.muted,
+    fontSize: 11,
+    marginTop: 1,
+  },
+
+  avatarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
   avatarItem: {
     width: "22%",
     aspectRatio: 1,
@@ -318,7 +444,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarItemActive: { borderColor: C.amber, backgroundColor: C.amberSoft },
+
+  avatarItemActive: {
+    borderColor: C.amber,
+    backgroundColor: C.amberSoft,
+  },
+
   avatarLabel: {
     color: "#cbd5e1",
     fontSize: 9,

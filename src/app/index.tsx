@@ -13,7 +13,7 @@ import {
 import { triggerHaptic } from "../services/audioHaptics";
 import { restorePortraitOrientation } from "../services/orientation";
 import { loadSettings, saveSettings } from "../services/storage";
-import { C, serif, shared } from "./theme";
+import { C, serif, shared } from '../theme/appTheme';
 
 type Difficulty = "easy" | "med" | "hard";
 
@@ -70,7 +70,11 @@ export default function HomeScreen() {
 
   const startOffline = () => {
     triggerHaptic("selection");
-    router.navigate({ pathname: "/game", params: { difficulty } } as any);
+    try {
+      router.navigate(`/game?difficulty=${difficulty}` as any);
+    } catch {
+      router.push(`/game?difficulty=${difficulty}` as any);
+    }
   };
 
   const comingSoon = (title: string, body: string) => {

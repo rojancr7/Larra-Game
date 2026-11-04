@@ -1,47 +1,48 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DEFAULT_THEME_ID, ThemeId } from '../constants/themeManifest';
 
 // ---------------------------------------------------------------------------
 // 1. SETTINGS TYPES & DEFAULTS
 // ---------------------------------------------------------------------------
 
-export type BoardColor =
-  | 'classic-green'
-  | 'emerald'
-  | 'royal-blue'
-  | 'velvet-burgundy'
-  | 'midnight-slate';
-
-export type CardBackColor =
-  | 'classic-blue'
-  | 'royal-red'
-  | 'gold-luxury'
-  | 'emerald-leaf';
-
 export type GameTheme = 'casino' | 'minimal' | 'regal';
+// Legacy aliases for old code – board and card back now share a theme ID
+export type BoardColor = ThemeId;
+export type CardBackColor = ThemeId;
 export type AIDifficulty = 'easy' | 'med' | 'hard';
+export type SpreadSpeed = 'slow' | 'medium' | 'fast' | 'instant';
+export type MusicTrackId = 'none' | 'sound1' | 'sound2';
 
 export interface GameSettings {
-  boardColor: BoardColor;
-  cardBack: CardBackColor;
+  themeId: ThemeId;
   cardFace: 'classic' | 'modern';
   playerName: string;
   soundEffects: boolean;
+  musicEnabled: boolean;
+  musicTrack: MusicTrackId;
   vibration: boolean;
   animations: boolean;
-  theme: GameTheme;
+  boardColor?: ThemeId;
+  cardBack?: ThemeId;
   difficulty?: AIDifficulty;
+  spreadSpeed: SpreadSpeed;
+  spreadSound: boolean;
+  cardMoveSound: boolean;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
-  boardColor: 'classic-green',
-  cardBack: 'gold-luxury',
+  themeId: DEFAULT_THEME_ID,
   cardFace: 'classic',
   playerName: 'Player 1',
   soundEffects: true,
+  musicEnabled: true,
+  musicTrack: 'sound1',
   vibration: true,
   animations: true,
-  theme: 'casino',
   difficulty: 'easy',
+  spreadSpeed: 'medium',
+  spreadSound: true,
+  cardMoveSound: true,
 };
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,13 @@
-import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { GROUP_SIZES, GroupTag, tagFor } from "../constants/handTags";
 import { colors, useTableScale } from "../constants/theme";
 import { Card } from "../engine/deck";
 import { triggerHaptic } from "../services/audioHaptics";
+import { playCardPlaceSound, playCardSpreadSound } from "../services/soundService";
+import { SpreadSpeed } from "../services/storage";
+import { ThemeId } from "../constants/themeManifest";
+import { useAppTheme } from "../services/themeManager";
 import { PlayingCard } from "./PlayingCard";
 
 export interface HandTrayProps {
@@ -18,6 +22,8 @@ export interface HandTrayProps {
   isGameOver?: boolean;
   /** When set, a gold THROW button appears above Confirm. */
   throwLabel?: string | null;
+  spreadSpeed?: SpreadSpeed;
+  themeId?: ThemeId;
   onTapCard: (card: Card) => void;
   onTapSlot: (index: number) => void;
   onTapPool: () => void;
@@ -50,6 +56,7 @@ interface SlotProps {
   glow: boolean;
   tag: GroupTag | null;
   locked: boolean;
+  themeId?: ThemeId;
   onTapCard: (card: Card) => void;
   onTapSlot: (i: number) => void;
 }
@@ -62,6 +69,7 @@ const HandSlot: React.FC<SlotProps> = ({
   glow,
   tag,
   locked,
+  themeId,
   onTapCard,
   onTapSlot,
 }) => {
@@ -74,7 +82,9 @@ const HandSlot: React.FC<SlotProps> = ({
 
   return (
     <View style={{ alignItems: "center" }}>
-      <View
+      <Pressable
+        disabled={locked}
+        onPress={() => onTapSlot(index)}
         style={[
           styles.slotLabel,
           { backgroundColor: c.bg, borderColor: c.border },
@@ -83,7 +93,7 @@ const HandSlot: React.FC<SlotProps> = ({
         <Text style={[styles.slotLabelText, { color: c.text }]}>
           {size} Cards
         </Text>
-      </View>
+      </Pressable>
 
       <Pressable
         disabled={locked}
@@ -111,7 +121,15 @@ const HandSlot: React.FC<SlotProps> = ({
                   size="md"
                   scale={k}
                   selected={card.id === selectedId}
-                  onPress={locked ? undefined : () => onTapCard(card)}
+                  themeId={themeId}
+                  onPress={
+                    locked
+                      ? undefined
+                      : () => {
+                          playCardPlaceSound();
+                          onTapCard(card);
+                        }
+                  }
                 />
               </View>
             ))}
@@ -143,6 +161,66 @@ const HandSlot: React.FC<SlotProps> = ({
   );
 };
 
+/**
+ * Animated card component for smooth dealing and spreading
+ */
+const AnimatedCard: React.FC<{
+  card: Card;
+  index: number;
+  selected: boolean;
+  scale: number;
+  speed: SpreadSpeed;
+  themeId?: ThemeId;
+  onPress: () => void;
+}> = ({ card, index, selected, scale, speed, themeId, onPress }) => {
+  const anim = useRef(new Animated.Value(speed === "instant" ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (speed === "instant") {
+      anim.setValue(1);
+      return;
+    }
+
+    const delayMs = speed === "slow" ? 65 : speed === "fast" ? 18 : 38;
+    const timer = setTimeout(() => {
+      Animated.spring(anim, {
+        toValue: 1,
+        friction: 6,
+        tension: 85,
+        useNativeDriver: true,
+      }).start();
+    }, index * delayMs);
+
+    return () => clearTimeout(timer);
+  }, [card.id, speed]);
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [24, 0],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        transform: [{ translateY }, { scale: anim }],
+        opacity: anim,
+      }}
+    >
+      <PlayingCard
+        card={card}
+        size="md"
+        scale={scale}
+        selected={selected}
+        themeId={themeId}
+        onPress={() => {
+          playCardPlaceSound();
+          onPress();
+        }}
+      />
+    </Animated.View>
+  );
+};
+
 export const HandTray: React.FC<HandTrayProps> = ({
   roundGroups,
   handCards,
@@ -152,6 +230,8 @@ export const HandTray: React.FC<HandTrayProps> = ({
   mode,
   isGameOver = false,
   throwLabel,
+  spreadSpeed = "medium",
+  themeId,
   onTapCard,
   onTapSlot,
   onTapPool,
@@ -162,6 +242,8 @@ export const HandTray: React.FC<HandTrayProps> = ({
   onNewMatch,
   onViewResults,
 }) => {
+  const appTheme = useAppTheme();
+  const activeThemeId = themeId || appTheme.id;
   const { W, H } = useTableScale();
   const locked = mode === "settled";
   const k = Math.max(
@@ -175,6 +257,16 @@ export const HandTray: React.FC<HandTrayProps> = ({
   const glowIndex =
     selectedGroup >= 0 ? selectedGroup : tags[3]?.tone === "bonus" ? 3 : -1;
   const sideWidth = W * 0.15;
+
+  // Trigger card spread sound when 13 cards are in hand at start of deal
+  const prevCountRef = useRef(handCards.length);
+  useEffect(() => {
+    if (handCards.length === 13 && prevCountRef.current < 13) {
+      playCardSpreadSound(spreadSpeed);
+      triggerHaptic("impactLight");
+    }
+    prevCountRef.current = handCards.length;
+  }, [handCards.length, spreadSpeed]);
 
   const leftBtn = locked
     ? { label: "RESULTS", icon: "📊", onPress: onViewResults }
@@ -236,11 +328,13 @@ export const HandTray: React.FC<HandTrayProps> = ({
                     zIndex: c.id === selectedCardId ? 50 : i,
                   }}
                 >
-                  <PlayingCard
+                  <AnimatedCard
                     card={c}
-                    size="md"
+                    index={i}
                     scale={k * 0.62}
                     selected={c.id === selectedCardId}
+                    speed={spreadSpeed}
+                    themeId={activeThemeId}
                     onPress={() => onTapCard(c)}
                   />
                 </View>
@@ -261,6 +355,7 @@ export const HandTray: React.FC<HandTrayProps> = ({
                 glow={glowIndex === i}
                 tag={tags[i]}
                 locked={locked}
+                themeId={activeThemeId}
                 onTapCard={onTapCard}
                 onTapSlot={onTapSlot}
               />
@@ -312,8 +407,10 @@ const styles = StyleSheet.create({
   trayWrap: { alignItems: "center" },
   pool: {
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(234, 179, 8, 0.3)",
     paddingHorizontal: 10,
     paddingVertical: 4,
     marginBottom: 6,

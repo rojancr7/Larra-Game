@@ -1,0 +1,81 @@
+{
+  "themes": [
+    {
+      "id": "emerald_mahogany",
+      "name": "Emerald Mahogany",
+      "board": "themes/set1_board.png",
+      "cardBack": "themes/set1_card_back.png",
+      "preview": "themes/set1_board.png",
+      "ui": {
+        "accent": "#d4a64a",
+        "panel": "#133c2a",
+        "text": "#f3e7c9",
+        "bg": "#1f5a3f",
+        "wood": "#3b190d",
+        "accentLight": "#ecdca8"
+      }
+    },
+    {
+      "id": "midnight_walnut",
+      "name": "Midnight Walnut",
+      "board": "themes/set2_board.png",
+      "cardBack": "themes/set2_card_back.png",
+      "preview": "themes/set2_board.png",
+      "ui": {
+        "accent": "#d9b15a",
+        "panel": "#0c1b40",
+        "text": "#efe6d0",
+        "bg": "#17306a",
+        "wood": "#26160c",
+        "accentLight": "#cf8a5c"
+      }
+    },
+    {
+      "id": "royal_plum",
+      "name": "Royal Plum",
+      "board": "themes/set3_board.png",
+      "cardBack": "themes/set3_card_back.png",
+      "preview": "themes/set3_board.png",
+      "ui": {
+        "accent": "#cf8a5c",
+        "panel": "#27133a",
+        "text": "#efe3dc",
+        "bg": "#43235a",
+        "wood": "#251410",
+        "accentLight": "#d5d9e2"
+      }
+    },
+    {
+      "id": "burgundy_rosewood",
+      "name": "Burgundy Rosewood",
+      "board": "themes/set4_board.png",
+      "cardBack": "themes/set4_card_back.png",
+      "preview": "themes/set4_board.png",
+      "ui": {
+        "accent": "#d8935f",
+        "panel": "#3f0f1e",
+        "text": "#f1e2d4",
+        "bg": "#6a1c32",
+        "wood": "#2a0c14",
+        "accentLight": "#cdbb6e"
+      }
+    },
+    {
+      "id": "stone_brass",
+      "name": "Stone Brass",
+      "board": "themes/set5_board.png",
+      "cardBack": "themes/set5_card_back.png",
+      "preview": "themes/set5_board.png",
+      "ui": {
+        "accent": "#c9a24d",
+        "panel": "#252e2e",
+        "text": "#ece6d6",
+        "bg": "#3f4a4a",
+        "wood": "#202525",
+        "accentLight": "#e6dcc0"
+      }
+    }
+  ],
+  "default": "emerald_mahogany"
+}
+

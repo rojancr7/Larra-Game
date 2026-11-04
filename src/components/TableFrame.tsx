@@ -1,109 +1,109 @@
-import React, { useState } from "react";
-import { StyleSheet, View } from "react-native";
-import Svg, {
-    Defs,
-    LinearGradient,
-    RadialGradient,
-    Rect,
-    Stop,
-} from "react-native-svg";
-import { feltPalette, useTableScale } from "../constants/theme";
-import type { BoardColor } from "../services/storage";
+import React, { createContext, useContext, useState } from "react";
+import { Image, StyleSheet, View } from "react-native";
+import { ThemeDef } from "../constants/themeManifest";
+import { useAppTheme } from "../services/themeManager";
+
+interface BoardLayoutContextType {
+  boardSize: number;
+  boardLeft: number;
+  boardTop: number;
+  scale: number; // boardSize / 1600
+  theme: ThemeDef;
+}
+
+export const BoardLayoutContext = createContext<BoardLayoutContextType>({
+  boardSize: 600,
+  boardLeft: 0,
+  boardTop: 0,
+  scale: 600 / 1600,
+  theme: null as any,
+});
+
+export const useBoardLayout = () => useContext(BoardLayoutContext);
 
 interface TableFrameProps {
-  boardColor?: BoardColor;
   children?: React.ReactNode;
 }
 
-/** Wood frame, felt with vignette, and a thin gold inner line. Children render on top. */
-export const TableFrame: React.FC<TableFrameProps> = ({
-  boardColor = "classic-green",
-  children,
-}) => {
-  const [size, setSize] = useState({ w: 0, h: 0 });
-  const { s } = useTableScale();
-  const felt = feltPalette[boardColor] || feltPalette["classic-green"];
-  const frame = Math.round(24 * s);
-  const { w, h } = size;
+/**
+ * Renders the 1600x1600 1:1 board without stretching.
+ * Background frame is rendered using theme.ui.wood and theme.ui.panel.
+ */
+export const TableFrame: React.FC<TableFrameProps> = ({ children }) => {
+  const theme = useAppTheme();
+  const [layout, setLayout] = useState({ w: 0, h: 0 });
+  const { w, h } = layout;
+
+  // Board is 1:1 aspect ratio. Scale to fit screen height in landscape (or min of w, h)
+  const boardSize = Math.max(1, Math.min(w || 800, h || 400));
+  const boardLeft = Math.max(0, (w - boardSize) / 2);
+  const boardTop = Math.max(0, (h - boardSize) / 2);
+  const scale = boardSize / 1600;
+
+  const contextValue: BoardLayoutContextType = {
+    boardSize,
+    boardLeft,
+    boardTop,
+    scale,
+    theme,
+  };
 
   return (
     <View
-      style={styles.root}
+      style={[styles.root, { backgroundColor: theme.ui.wood }]}
       onLayout={(e) =>
-        setSize({
+        setLayout({
           w: e.nativeEvent.layout.width,
           h: e.nativeEvent.layout.height,
         })
       }
     >
-      {w > 0 && (
-        <Svg width={w} height={h} style={StyleSheet.absoluteFill}>
-          <Defs>
-            <LinearGradient id="wood" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor="#7a4d27" />
-              <Stop offset="0.5" stopColor="#5a3719" />
-              <Stop offset="1" stopColor="#2e1a0b" />
-            </LinearGradient>
-            <RadialGradient id="felt" cx="50%" cy="48%" rx="60%" ry="65%">
-              <Stop offset="0" stopColor={felt.center} />
-              <Stop offset="1" stopColor={felt.edge} />
-            </RadialGradient>
-            <RadialGradient id="vig" cx="50%" cy="50%" rx="72%" ry="75%">
-              <Stop offset="0.55" stopColor="#000" stopOpacity="0" />
-              <Stop offset="1" stopColor="#000" stopOpacity="0.55" />
-            </RadialGradient>
-          </Defs>
+      {w > 0 && h > 0 && (
+        <BoardLayoutContext.Provider value={contextValue}>
+          {/* Centered 1:1 Board Image */}
+          <View
+            style={[
+              styles.boardContainer,
+              {
+                width: boardSize,
+                height: boardSize,
+                left: boardLeft,
+                top: boardTop,
+              },
+            ]}
+          >
+            <Image
+              source={theme.boardSource}
+              style={styles.boardImage}
+              resizeMode="contain"
+            />
+          </View>
 
-          <Rect x={0} y={0} width={w} height={h} fill="url(#wood)" />
-          <Rect
-            x={frame * 0.4}
-            y={frame * 0.4}
-            width={w - frame * 0.8}
-            height={h - frame * 0.8}
-            rx={26 * s}
-            fill="none"
-            stroke="#1d1008"
-            strokeOpacity={0.6}
-            strokeWidth={2}
-          />
-          <Rect
-            x={frame}
-            y={frame}
-            width={w - frame * 2}
-            height={h - frame * 2}
-            rx={20 * s}
-            fill="url(#felt)"
-          />
-          <Rect
-            x={frame}
-            y={frame}
-            width={w - frame * 2}
-            height={h - frame * 2}
-            rx={20 * s}
-            fill="url(#vig)"
-          />
-          <Rect
-            x={frame + 14 * s}
-            y={frame + 14 * s}
-            width={w - (frame + 14 * s) * 2}
-            height={h - (frame + 14 * s) * 2}
-            rx={14 * s}
-            fill="none"
-            stroke="#eab308"
-            strokeOpacity={0.35}
-            strokeWidth={1.5}
-          />
-        </Svg>
+          {/* Live UI layered directly ON TOP of the board image */}
+          <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+            {children}
+          </View>
+        </BoardLayoutContext.Provider>
       )}
-      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-        {children}
-      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#1d1008" },
+  root: {
+    flex: 1,
+    overflow: "hidden",
+  },
+  boardContainer: {
+    position: "absolute",
+    aspectRatio: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  boardImage: {
+    width: "100%",
+    height: "100%",
+  },
 });
 
 export default TableFrame;

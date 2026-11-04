@@ -1,8 +1,8 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Home, User, Clock, ShoppingBag, Settings } from 'lucide-react-native';
-import { TopBar } from './topbar';
-import { C } from './theme';
+import { TopBar } from '../components/TopBar';
+import { C } from '../theme/appTheme';
 
 export default function TabsLayout() {
   return (
@@ -68,16 +68,16 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="game"
         options={{
-          href: null,
+          tabBarButton: () => null,
           tabBarStyle: { display: 'none' },
-          header: () => null,
+          headerShown: false,
         }}
       />
       <Tabs.Screen
         name="online"
         options={{
-          href: null,
-          header: () => null,
+          tabBarButton: () => null,
+          headerShown: false,
         }}
       />
     </Tabs>

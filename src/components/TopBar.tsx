@@ -10,7 +10,7 @@ import {
   loadProfile,
   PlayerProfile,
 } from "../services/storage";
-import { C, serif } from "./theme";
+import { C, serif } from "../theme/appTheme";
 
 // Logo lives at <project root>/assets/logo.jpg
 const LOGO = require("../../assets/images/logo.jpg");

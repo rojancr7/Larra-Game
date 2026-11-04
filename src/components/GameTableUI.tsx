@@ -3,7 +3,9 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, useTableScale } from "../constants/theme";
 import { Card } from "../engine/deck";
 import { GameState } from "../engine/gameController";
-import { AVATAR_PRESETS, BoardColor, CardBackColor, AIDifficulty } from "../services/storage";
+import { AIDifficulty, AVATAR_PRESETS, SpreadSpeed } from "../services/storage";
+import { ThemeId, getThemeById } from "../constants/themeManifest";
+import { useAppTheme } from "../services/themeManager";
 import {
     ActiveBonusNotification,
     BonusNotificationBanner,
@@ -20,8 +22,8 @@ import { TableFrame } from "./TableFrame";
 export interface GameTableUIProps {
   game: GameState;
   humanName: string;
-  boardColor?: BoardColor;
-  cardBack?: CardBackColor;
+  themeId?: ThemeId;
+  spreadSpeed?: SpreadSpeed;
   animations?: boolean;
   targetPoints?: number;
   difficulty?: AIDifficulty;
@@ -53,8 +55,8 @@ export interface GameTableUIProps {
 export const GameTableUI: React.FC<GameTableUIProps> = ({
   game,
   humanName,
-  boardColor = "classic-green",
-  cardBack = "gold-luxury",
+  themeId,
+  spreadSpeed = "medium",
   animations = true,
   targetPoints = 20,
   difficulty = "easy",
@@ -80,6 +82,8 @@ export const GameTableUI: React.FC<GameTableUIProps> = ({
   onViewResults,
 }) => {
   const { s } = useTableScale();
+  const appTheme = useAppTheme();
+  const theme = themeId ? getThemeById(themeId) : appTheme;
   const me = game.players[0];
   const results = game.roundResults || [];
   const players = game.players.map((p, i) =>
@@ -109,19 +113,26 @@ export const GameTableUI: React.FC<GameTableUIProps> = ({
   const roundLabel = `ROUND ${Math.min(activeRound + 1, 4)}/4 - ${activeRound >= 3 ? 4 : 3} CARDS`;
 
   return (
-    <TableFrame boardColor={boardColor}>
+    <TableFrame>
       {/* Top-left: menu, logo, pills */}
       <Pressable
         style={[
           styles.iconBtn,
-          { left: 8 * s, top: 8 * s, width: 40 * s, height: 40 * s },
+          {
+            left: 8 * s,
+            top: 8 * s,
+            width: 40 * s,
+            height: 40 * s,
+            backgroundColor: theme.ui.panel,
+            borderColor: theme.ui.accent,
+          },
         ]}
         onPress={onOpenMenu}
       >
         <Text style={styles.iconText}>☰</Text>
       </Pressable>
       <View style={{ position: "absolute", left: 58 * s, top: 8 * s }}>
-        <Text style={[styles.logo, { fontSize: 26 * s }]}>♠ LARRA</Text>
+        <Text style={[styles.logo, { fontSize: 26 * s, color: theme.ui.accent }]}>♠ LARRA</Text>
         <View style={{ gap: 4, marginTop: 4 }}>
           <HudPill icon="🎯" label={`TARGET: ${targetPoints} PTS`} />
           <HudPill label={roundLabel} />
@@ -136,7 +147,14 @@ export const GameTableUI: React.FC<GameTableUIProps> = ({
       <Pressable
         style={[
           styles.iconBtn,
-          { right: 8 * s, top: 8 * s, width: 40 * s, height: 40 * s },
+          {
+            right: 8 * s,
+            top: 8 * s,
+            width: 40 * s,
+            height: 40 * s,
+            backgroundColor: theme.ui.panel,
+            borderColor: theme.ui.accent,
+          },
         ]}
         onPress={onOpenSettings}
       >
@@ -161,7 +179,7 @@ export const GameTableUI: React.FC<GameTableUIProps> = ({
           faceDown
           size="md"
           scale={0.5 * s}
-          cardBackTheme={cardBack}
+          themeId={theme.id}
         />
       </View>
 
@@ -181,7 +199,7 @@ export const GameTableUI: React.FC<GameTableUIProps> = ({
           score={game.scores[2]}
           position="top"
           avatarIndex={3}
-          cardBack={cardBack}
+          themeId={theme.id}
           isWinner={game.matchWinner?.playerId === game.players[2].id}
         />
       </View>
@@ -191,7 +209,7 @@ export const GameTableUI: React.FC<GameTableUIProps> = ({
           score={game.scores[3]}
           position="left"
           avatarIndex={1}
-          cardBack={cardBack}
+          themeId={theme.id}
           isWinner={game.matchWinner?.playerId === game.players[3].id}
         />
       </View>
@@ -201,7 +219,7 @@ export const GameTableUI: React.FC<GameTableUIProps> = ({
           score={game.scores[1]}
           position="right"
           avatarIndex={2}
-          cardBack={cardBack}
+          themeId={theme.id}
           isWinner={game.matchWinner?.playerId === game.players[1].id}
         />
       </View>
@@ -265,6 +283,8 @@ export const GameTableUI: React.FC<GameTableUIProps> = ({
           mode={game.isSettled ? "settled" : "arrange"}
           isGameOver={game.isGameOver}
           throwLabel={throwLabel}
+          spreadSpeed={spreadSpeed}
+          themeId={theme.id}
           onTapCard={onTapCard}
           onTapSlot={onTapSlot}
           onTapPool={onTapPool}

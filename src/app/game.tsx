@@ -7,11 +7,12 @@ import { AIDifficulty } from '../services/storage';
 
 export default function GameScreen() {
   const params = useLocalSearchParams<{ difficulty?: AIDifficulty }>();
+  const difficulty = params.difficulty || 'easy';
 
   return (
     <View style={styles.container}>
       <StatusBar hidden />
-      <GameTable initialDifficulty={params.difficulty || 'easy'} />
+      <GameTable key={difficulty} initialDifficulty={difficulty} />
     </View>
   );
 }

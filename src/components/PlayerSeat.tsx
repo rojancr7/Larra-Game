@@ -4,7 +4,8 @@ import { useTableScale } from "../constants/theme";
 import { Card } from "../engine/deck";
 import { Player } from "../engine/gameController";
 import { PlayerScore } from "../engine/scoring";
-import { AVATAR_PRESETS, CardBackColor } from "../services/storage";
+import { AVATAR_PRESETS } from "../services/storage";
+import { ThemeId } from "../constants/themeManifest";
 import { Avatar } from "./Avatar";
 import { PlayingCard } from "./PlayingCard";
 
@@ -19,7 +20,7 @@ interface PlayerSeatProps {
   isRoundWinner?: boolean;
   /** Picks which AVATAR_PRESETS entry this seat uses. */
   avatarIndex?: number;
-  cardBack?: CardBackColor;
+  themeId?: ThemeId;
 }
 
 export const PlayerSeat: React.FC<PlayerSeatProps> = ({
@@ -31,7 +32,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
   roundHandLabel,
   isRoundWinner = false,
   avatarIndex = 1,
-  cardBack = "gold-luxury",
+  themeId,
 }) => {
   const { s } = useTableScale();
   const preset = AVATAR_PRESETS[avatarIndex % AVATAR_PRESETS.length];
@@ -65,7 +66,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
               faceDown
               size="md"
               scale={cardScale}
-              cardBackTheme={cardBack}
+              themeId={themeId}
             />
           </View>
         ))}

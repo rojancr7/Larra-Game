@@ -2,7 +2,6 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { colors } from "../constants/theme";
 import { Card } from "../engine/deck";
-import { CardBackColor } from "../services/storage";
 import { PlayingCard } from "./PlayingCard";
 
 /** Overlapping fan of cards. Face-up by default; pass faceDown for a draw-pile look. */
@@ -10,8 +9,7 @@ export const CardFan: React.FC<{
   cards: Card[];
   scale?: number;
   faceDown?: boolean;
-  cardBack?: CardBackColor;
-}> = ({ cards, scale = 0.8, faceDown = false, cardBack }) => {
+}> = ({ cards, scale = 0.8, faceDown = false }) => {
   const n = cards.length;
   const cw = 62 * scale;
   const ch = 88 * scale;
@@ -45,7 +43,6 @@ export const CardFan: React.FC<{
                 faceDown={faceDown}
                 size="md"
                 scale={scale}
-                cardBackTheme={cardBack}
               />
             </View>
           );

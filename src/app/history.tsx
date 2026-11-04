@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from 'react-nati
 import { useFocusEffect } from 'expo-router';
 import { loadHistory, clearHistory, MatchHistoryItem } from '../services/storage';
 import { triggerHaptic } from '../services/audioHaptics';
-import { C, shared } from './theme';
+import { C, shared } from '../theme/appTheme';
 
 const fmtDuration = (s: number) => `${Math.floor(s / 60)}m ${s % 60}s`;
 

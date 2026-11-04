@@ -30,6 +30,12 @@ import {
   restorePortraitOrientation,
 } from "../services/orientation";
 import {
+  playBackgroundMusic,
+  playCardSpreadSound,
+  stopBackgroundMusic,
+} from "../services/soundService";
+import {
+  AIDifficulty,
   DEFAULT_PROFILE,
   DEFAULT_SETTINGS,
   GameSettings,
@@ -37,12 +43,11 @@ import {
   HistoryRoundResult,
   loadProfile,
   loadSettings,
-  saveSettings,
   MatchHistoryItem,
   PlayerProfile,
   saveMatchToHistory,
+  saveSettings,
   updateProfileStats,
-  AIDifficulty,
 } from "../services/storage";
 import { ActiveBonusNotification } from "./BonusNotificationBanner";
 import { GameTableUI } from "./GameTableUI";
@@ -77,13 +82,27 @@ export const GameTable: React.FC<GameTableProps> = ({ initialDifficulty }) => {
   const matchStartTimeRef = useRef<number>(Date.now());
   const matchSavedRef = useRef<boolean>(false);
 
-  // Lock orientation to landscape on mount, restore on unmount
+  // Lock orientation to landscape on mount, restore on unmount; stop music on unmount
   useEffect(() => {
     lockToLandscape();
     return () => {
       restorePortraitOrientation();
+      stopBackgroundMusic();
     };
   }, []);
+
+  // Sync background music with current settings
+  useEffect(() => {
+    if (
+      settings.musicEnabled &&
+      settings.musicTrack &&
+      settings.musicTrack !== "none"
+    ) {
+      playBackgroundMusic(settings.musicTrack);
+    } else {
+      stopBackgroundMusic();
+    }
+  }, [settings.musicEnabled, settings.musicTrack]);
 
   // Load settings and profile
   useEffect(() => {
@@ -214,14 +233,17 @@ export const GameTable: React.FC<GameTableProps> = ({ initialDifficulty }) => {
   const handleAutoArrange = () => {
     triggerHaptic("selection");
     try {
-      const auto = generateAIPartition(localPlayer.cards);
-      let next = createInitialPartitionState(localPlayer.cards);
-      auto.forEach((group, gi) => {
-        group.forEach((c) => {
-          next = transferCard(next, c.id, gi);
-        });
+      const auto = generateAIPartition(localPlayer.cards, {
+        difficulty: "hard",
       });
-      setPartitionState(next);
+      setPartitionState({
+        originalCards: [...localPlayer.cards],
+        handCards: [],
+        roundGroups: auto,
+        selectedCardId: null,
+        targetRound: 0,
+      });
+      triggerHaptic("success");
     } catch (err) {
       console.warn("Auto-arrange failed:", err);
     }
@@ -418,6 +440,7 @@ export const GameTable: React.FC<GameTableProps> = ({ initialDifficulty }) => {
   const handleNextDeal = () => {
     try {
       triggerHaptic("selection");
+      playCardSpreadSound(settings.spreadSpeed);
       const nextDeal = startNextDeal(game);
       setGame(nextDeal);
       checkDealInstantBonuses(nextDeal);
@@ -428,6 +451,7 @@ export const GameTable: React.FC<GameTableProps> = ({ initialDifficulty }) => {
 
   const handleNewMatch = () => {
     triggerHaptic("selection");
+    playCardSpreadSound(settings.spreadSpeed);
     matchStartTimeRef.current = Date.now();
     matchSavedRef.current = false;
     const newGame = startNewGame();
@@ -440,6 +464,7 @@ export const GameTable: React.FC<GameTableProps> = ({ initialDifficulty }) => {
   };
 
   const handleExitToHome = () => {
+    stopBackgroundMusic();
     restorePortraitOrientation();
     router.replace("/");
   };
@@ -449,8 +474,7 @@ export const GameTable: React.FC<GameTableProps> = ({ initialDifficulty }) => {
       <GameTableUI
         game={game}
         humanName={humanName}
-        boardColor={settings.boardColor}
-        cardBack={settings.cardBack}
+        spreadSpeed={settings.spreadSpeed}
         animations={settings.animations}
         bonusNotifications={notifications}
         onDismissBonus={handleDismissNotification}
@@ -482,6 +506,11 @@ export const GameTable: React.FC<GameTableProps> = ({ initialDifficulty }) => {
         game={game}
         difficulty={difficulty}
         onChangeDifficulty={handleChangeDifficulty}
+        settings={settings}
+        onUpdateSettings={(newSettings) => {
+          setSettings(newSettings);
+          saveSettings(newSettings);
+        }}
         onClose={() => setShowMenuModal(false)}
         onOpenSettings={() => {
           setShowMenuModal(false);

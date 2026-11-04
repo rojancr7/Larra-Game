@@ -1,7 +1,8 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { Card, Suit } from "../engine/deck";
-import { CardBackColor } from "../services/storage";
+import { ThemeDef, ThemeId, getThemeById } from "../constants/themeManifest";
+import { useAppTheme } from "../services/themeManager";
 
 interface PlayingCardProps {
   card?: Card | null;
@@ -10,17 +11,18 @@ interface PlayingCardProps {
   onPress?: () => void;
   disabled?: boolean;
   size?: "xs" | "sm" | "md" | "lg";
-  /** Multiplies the base size. Use this to fit cards to the screen. */
+  /** Multiplies base size. Preserves exact 5:7 card ratio. */
   scale?: number;
-  cardBackTheme?: CardBackColor;
+  themeId?: ThemeId;
   style?: ViewStyle;
 }
 
+// Exactly 5:7 aspect ratio (900x1260 specs)
 const BASE = {
-  xs: { w: 36, h: 50 },
-  sm: { w: 42, h: 58 },
-  md: { w: 62, h: 88 },
-  lg: { w: 78, h: 112 },
+  xs: { w: 35, h: 49 },
+  sm: { w: 45, h: 63 },
+  md: { w: 60, h: 84 },
+  lg: { w: 80, h: 112 },
 };
 
 const SUIT_SYMBOLS: Record<Suit, string> = {
@@ -36,36 +38,6 @@ const SUIT_COLORS: Record<Suit, string> = {
   spades: "#111827",
 };
 
-const BACKS: Record<
-  CardBackColor,
-  { bg: string; border: string; inner: string; symbol: string }
-> = {
-  "gold-luxury": {
-    bg: "#b8873a",
-    border: "#f1d38a",
-    inner: "#8a5d22",
-    symbol: "#f7e2a8",
-  },
-  "royal-red": {
-    bg: "#991b1b",
-    border: "#fca5a5",
-    inner: "#7f1d1d",
-    symbol: "#fecaca",
-  },
-  "classic-blue": {
-    bg: "#1e3a8a",
-    border: "#93c5fd",
-    inner: "#172554",
-    symbol: "#bfdbfe",
-  },
-  "emerald-leaf": {
-    bg: "#065f46",
-    border: "#6ee7b7",
-    inner: "#064e3b",
-    symbol: "#a7f3d0",
-  },
-};
-
 export const PlayingCard: React.FC<PlayingCardProps> = ({
   card,
   faceDown = false,
@@ -74,15 +46,17 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
   disabled = false,
   size = "md",
   scale = 1,
-  cardBackTheme = "gold-luxury",
+  themeId,
   style,
 }) => {
+  const activeTheme = useAppTheme();
+  const theme: ThemeDef = themeId ? getThemeById(themeId) : activeTheme;
+
   const w = Math.round(BASE[size].w * scale);
   const h = Math.round(BASE[size].h * scale);
-  const radius = Math.max(3, Math.round(w * 0.11));
+  const radius = Math.max(3, Math.round(w * 0.12));
 
   if (faceDown || !card) {
-    const t = BACKS[cardBackTheme] || BACKS["gold-luxury"];
     return (
       <View
         style={[
@@ -91,168 +65,150 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
             width: w,
             height: h,
             borderRadius: radius,
-            backgroundColor: t.bg,
-            borderColor: t.border,
-            borderWidth: Math.max(1.5, w * 0.045),
-            alignItems: "center",
-            justifyContent: "center",
+            borderColor: theme.ui.accent,
+            borderWidth: Math.max(1, w * 0.035),
+            overflow: "hidden",
+            backgroundColor: "transparent",
           },
           style,
         ]}
       >
-        <View
-          style={{
-            width: "80%",
-            height: "86%",
-            borderRadius: Math.max(2, radius - 2),
-            borderWidth: 1,
-            borderColor: "rgba(255,255,255,0.35)",
-            backgroundColor: t.inner,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text
-            style={{
-              color: t.symbol,
-              fontSize: w * 0.42,
-              opacity: 0.9,
-              includeFontPadding: false,
-            }}
-          >
-            ♦
-          </Text>
-        </View>
+        <Image
+          source={theme.cardBackSource}
+          style={{ width: "100%", height: "100%" }}
+          resizeMode="cover"
+        />
       </View>
     );
   }
 
-  const symbol = SUIT_SYMBOLS[card.suit];
   const color = SUIT_COLORS[card.suit];
-  const rankSize = w * 0.3;
-  const suitSize = w * 0.24;
+  const symbol = SUIT_SYMBOLS[card.suit];
 
-  const face = (
+  const content = (
     <View
       style={[
         styles.base,
+        styles.faceUp,
         {
           width: w,
           height: h,
           borderRadius: radius,
-          backgroundColor: "#ffffff",
-          paddingHorizontal: w * 0.08,
-          paddingVertical: h * 0.04,
+          backgroundColor: "#fffdfa",
+          borderColor: selected ? theme.ui.accent : "#d6d3d1",
+          borderWidth: selected ? Math.max(2, w * 0.06) : 1,
         },
-        selected && styles.selected,
+        selected && {
+          shadowColor: theme.ui.accent,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.8,
+          shadowRadius: 6,
+          elevation: 8,
+          transform: [{ translateY: -6 }],
+        },
         style,
       ]}
     >
-      <View style={styles.cornerTL}>
+      {/* Top-left rank & mini suit */}
+      <View style={[styles.corner, { top: 2 * scale, left: 3 * scale }]}>
         <Text
-          style={{
-            color,
-            fontSize: rankSize,
-            lineHeight: rankSize * 1.05,
-            fontWeight: "800",
-            includeFontPadding: false,
-          }}
+          style={[
+            styles.rank,
+            { color, fontSize: Math.max(9, Math.round(11 * scale)) },
+          ]}
         >
           {card.rank}
         </Text>
         <Text
-          style={{
-            color,
-            fontSize: suitSize,
-            lineHeight: suitSize * 1.1,
-            includeFontPadding: false,
-          }}
+          style={[
+            styles.miniSuit,
+            { color, fontSize: Math.max(7, Math.round(9 * scale)) },
+          ]}
         >
           {symbol}
         </Text>
       </View>
 
+      {/* Center suit emblem */}
+      <View style={styles.center}>
+        <Text
+          style={[
+            styles.bigSuit,
+            { color, fontSize: Math.max(13, Math.round(22 * scale)) },
+          ]}
+        >
+          {symbol}
+        </Text>
+      </View>
+
+      {/* Bottom-right upside-down rank & mini suit */}
       <View
         style={[
-          StyleSheet.absoluteFill,
+          styles.corner,
           {
-            alignItems: "center",
-            justifyContent: "center",
-            paddingTop: h * 0.1,
+            bottom: 2 * scale,
+            right: 3 * scale,
+            transform: [{ rotate: "180deg" }],
           },
         ]}
       >
         <Text
-          style={{
-            color,
-            fontSize: w * 0.7,
-            opacity: 0.92,
-            includeFontPadding: false,
-          }}
-        >
-          {symbol}
-        </Text>
-      </View>
-
-      <View style={styles.cornerBR}>
-        <Text
-          style={{
-            color,
-            fontSize: rankSize * 0.7,
-            lineHeight: rankSize * 0.75,
-            fontWeight: "800",
-            includeFontPadding: false,
-          }}
+          style={[
+            styles.rank,
+            { color, fontSize: Math.max(9, Math.round(11 * scale)) },
+          ]}
         >
           {card.rank}
+        </Text>
+        <Text
+          style={[
+            styles.miniSuit,
+            { color, fontSize: Math.max(7, Math.round(9 * scale)) },
+          ]}
+        >
+          {symbol}
         </Text>
       </View>
     </View>
   );
 
-  const lift = selected ? -h * 0.1 : 0;
-
   if (onPress && !disabled) {
     return (
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => ({
-          transform: [{ translateY: lift }, { scale: pressed ? 0.97 : 1 }],
-        })}
-      >
-        {face}
+      <Pressable onPress={onPress} hitSlop={4}>
+        {content}
       </Pressable>
     );
   }
 
-  return <View style={{ transform: [{ translateY: lift }] }}>{face}</View>;
+  return content;
 };
 
 const styles = StyleSheet.create({
   base: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 3,
-    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  selected: {
-    borderColor: "#eab308",
-    borderWidth: 2,
-    shadowColor: "#eab308",
-    shadowOpacity: 0.7,
-    shadowRadius: 6,
-    elevation: 8,
+  faceUp: {
+    position: "relative",
   },
-  cornerTL: { alignItems: "center", alignSelf: "flex-start" },
-  cornerBR: {
+  corner: {
     position: "absolute",
-    right: 3,
-    bottom: 2,
-    transform: [{ rotate: "180deg" }],
+    alignItems: "center",
+  },
+  rank: {
+    fontWeight: "900",
+    lineHeight: 12,
+  },
+  miniSuit: {
+    fontWeight: "900",
+    lineHeight: 10,
+  },
+  center: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  bigSuit: {
+    fontWeight: "900",
   },
 });
 

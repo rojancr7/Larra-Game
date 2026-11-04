@@ -19,14 +19,26 @@ export const colors = {
 };
 
 /** Felt colors for each Settings > Table Felt option (center is lighter, edge is darker). */
-export const feltPalette: Record<BoardColor, { center: string; edge: string }> =
-  {
-    "classic-green": { center: "#1c6e3b", edge: "#0a3a1d" },
-    emerald: { center: "#0f7a58", edge: "#053b2c" },
-    "royal-blue": { center: "#2f56b8", edge: "#12275c" },
-    "velvet-burgundy": { center: "#7a1632", edge: "#330713" },
-    "midnight-slate": { center: "#2b3a55", edge: "#0b1220" },
-  };
+export const feltPalette: Record<
+  | BoardColor
+  | "classic-green"
+  | "emerald"
+  | "royal-blue"
+  | "velvet-burgundy"
+  | "midnight-slate",
+  { center: string; edge: string }
+> = {
+  "classic-green": { center: "#1c6e3b", edge: "#0a3a1d" },
+  emerald: { center: "#0f7a58", edge: "#053b2c" },
+  "royal-blue": { center: "#2f56b8", edge: "#12275c" },
+  "velvet-burgundy": { center: "#7a1632", edge: "#330713" },
+  "midnight-slate": { center: "#2b3a55", edge: "#0b1220" },
+  emerald_mahogany: { center: "#0f684d", edge: "#073225" },
+  midnight_walnut: { center: "#273448", edge: "#101923" },
+  royal_plum: { center: "#56306f", edge: "#271634" },
+  burgundy_rosewood: { center: "#741d39", edge: "#350d1b" },
+  stone_brass: { center: "#5c625b", edge: "#292d29" },
+};
 
 /** Scale factor for a landscape layout designed at 844 x 390. Works even if width/height are swapped. */
 export function useTableScale() {
