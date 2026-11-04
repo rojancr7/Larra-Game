@@ -1,5 +1,5 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -26,23 +26,140 @@ import {
   resetSettings,
   saveSettings,
 } from "../services/storage";
-import { C, shared } from '../theme/appTheme';
+import { Palette, ThemeMode, useTheme } from "../theme/appThemee";
+
+type Difficulty = GameSettings["difficulty"];
+
+const THEME_OPTIONS: { id: ThemeMode; label: string }[] = [
+  { id: "system", label: "Match phone" },
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark" },
+];
+
+const SPEED_OPTIONS: { id: SpreadSpeed; label: string; desc: string }[] = [
+  {
+    id: "slow",
+    label: "Slow",
+    desc: "Relaxed, like a dealer at a casino table.",
+  },
+  { id: "medium", label: "Medium", desc: "A natural pace. Recommended." },
+  {
+    id: "fast",
+    label: "Fast",
+    desc: "Quick dealing for players who know the game.",
+  },
+  {
+    id: "instant",
+    label: "Instant",
+    desc: "Cards appear at once, with no dealing animation.",
+  },
+];
+
+const DIFFICULTY_OPTIONS: { id: string; label: string; desc: string }[] = [
+  {
+    id: "easy",
+    label: "Easy",
+    desc: "Plays casually. Good for learning the game.",
+  },
+  {
+    id: "med",
+    label: "Medium",
+    desc: "A balanced opponent that plays a fair game.",
+  },
+  {
+    id: "hard",
+    label: "Hard",
+    desc: "Plans its hand carefully and rarely makes mistakes.",
+  },
+];
+
+const TRACK_NAMES: Record<string, string> = {
+  sound1: "Casino lounge",
+  sound2: "Night arena",
+  none: "No music",
+};
+
+// Row of choices where exactly one is selected
+function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { id: T; label: string }[];
+  value: T;
+  onChange: (id: T) => void;
+}) {
+  const { c } = useTheme();
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        backgroundColor: c.inset,
+        borderRadius: 12,
+        padding: 3,
+        gap: 2,
+      }}
+    >
+      {options.map((o) => {
+        const on = o.id === value;
+        return (
+          <Pressable
+            key={o.id}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+            onPress={() => onChange(o.id)}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              borderRadius: 9,
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: on ? c.border : "transparent",
+              backgroundColor: on ? c.surface : "transparent",
+            }}
+          >
+            <Text
+              style={{
+                color: on ? c.text : c.textMuted,
+                fontSize: 13,
+                fontWeight: on ? "800" : "600",
+              }}
+            >
+              {o.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
 
 export default function SettingsScreen() {
+  const { c, shared, mode, setMode, scheme } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
+
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
   const [previewingMusic, setPreviewingMusic] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Always holds the newest settings, so two quick changes never overwrite each other
+  const latest = useRef<GameSettings>(DEFAULT_SETTINGS);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       loadSettings().then((s) => {
-        if (active) setSettings(s);
+        if (!active) return;
+        latest.current = s;
+        setSettings(s);
       });
       return () => {
         active = false;
         stopBackgroundMusic();
+        setPreviewingMusic(false);
       };
     }, []),
   );
@@ -53,12 +170,11 @@ export default function SettingsScreen() {
     timer.current = setTimeout(() => setSaved(false), 1500);
   };
 
-  const update = <K extends keyof GameSettings>(
-    key: K,
-    val: GameSettings[K],
-  ) => {
-    triggerHaptic("selection");
-    const next = { ...settings, [key]: val };
+  // Change one or more settings at once
+  const apply = (patch: Partial<GameSettings>, haptic = true) => {
+    if (haptic) triggerHaptic("selection");
+    const next = { ...latest.current, ...patch };
+    latest.current = next;
     setSettings(next);
     saveSettings(next);
     flashSaved();
@@ -80,20 +196,46 @@ export default function SettingsScreen() {
       await stopBackgroundMusic();
       setPreviewingMusic(false);
     } else {
-      const track = settings.musicTrack === "none" ? "sound1" : settings.musicTrack;
+      const track =
+        settings.musicTrack === "none" ? "sound1" : settings.musicTrack;
       await playBackgroundMusic(track);
       setPreviewingMusic(true);
     }
   };
 
+  const handlePickTrack = async (id: MusicTrackId) => {
+    apply({ musicTrack: id, musicEnabled: id !== "none" });
+    if (previewingMusic) {
+      if (id === "none") {
+        await stopBackgroundMusic();
+        setPreviewingMusic(false);
+      } else {
+        await playBackgroundMusic(id);
+      }
+    }
+  };
+
   const handleReset = async () => {
+    // First tap asks, second tap does it (Alert doesn't work on web)
+    if (!confirmReset) {
+      setConfirmReset(true);
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+      resetTimer.current = setTimeout(() => setConfirmReset(false), 3000);
+      return;
+    }
+    setConfirmReset(false);
     triggerHaptic("warning");
     await stopBackgroundMusic();
     setPreviewingMusic(false);
     const fresh = await resetSettings();
+    latest.current = fresh;
     setSettings(fresh);
     flashSaved();
   };
+
+  const speed = settings.spreadSpeed || "medium";
+  const difficulty = settings.difficulty || "easy";
+  const soundOn = settings.soundEffects;
 
   return (
     <ScrollView
@@ -103,470 +245,364 @@ export default function SettingsScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.headRow}>
-        <View>
-          <Text style={shared.pageTitle}>⚙️ Settings & Audio Controls</Text>
+        <View style={{ flex: 1, paddingRight: 12 }}>
+          <Text style={shared.pageTitle}>Settings</Text>
           <Text style={shared.pageSub}>
-            Manage card dealing speed, realistic sounds, music and bot difficulty
+            Look, sound, dealing speed and the computer opponent
           </Text>
         </View>
-        {saved && <Text style={styles.saved}>Saved ✓</Text>}
+        {saved && (
+          <View style={styles.savedPill}>
+            <Text style={styles.savedText}>Saved</Text>
+          </View>
+        )}
       </View>
 
-      {/* Card Dealing & Spread Speed */}
+      {/* Appearance */}
       <View style={shared.card}>
-        <View style={styles.sectionHeaderRow}>
-          <View>
-            <Text style={styles.title}>🃏 Card Spread & Dealing Speed</Text>
-            <Text style={styles.sub}>
-              Controls the physical dealing animation and sound timing of 13 cards
-            </Text>
-          </View>
-        </View>
+        <Text style={styles.title}>Appearance</Text>
+        <Text style={styles.sub}>
+          {mode === "system"
+            ? `Following your phone. Right now that means ${scheme} mode.`
+            : `Always ${mode} mode, whatever your phone is set to.`}
+        </Text>
+        <Segmented options={THEME_OPTIONS} value={mode} onChange={setMode} />
+      </View>
 
-        <View style={styles.speedGrid}>
-          {[
-            {
-              id: "slow" as SpreadSpeed,
-              label: "Slow (Relaxed)",
-              desc: "Cinematic, deliberate casino card dealing (65ms step)",
-            },
-            {
-              id: "medium" as SpreadSpeed,
-              label: "Medium (Realistic)",
-              desc: "Smooth realistic physical card flow — Default recommended (38ms step)",
-            },
-            {
-              id: "fast" as SpreadSpeed,
-              label: "Fast (Snappy)",
-              desc: "Rapid dealing for fast tournament play (18ms step)",
-            },
-            {
-              id: "instant" as SpreadSpeed,
-              label: "Instant",
-              desc: "Immediate card placement without staggered animation",
-            },
-          ].map((s) => {
-            const active = (settings.spreadSpeed || "medium") === s.id;
-            return (
-              <Pressable
-                key={s.id}
-                style={[styles.speedOption, active && styles.speedOptionActive]}
-                onPress={() => update("spreadSpeed", s.id)}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[
-                      styles.speedOptionLabel,
-                      active && styles.speedOptionLabelActive,
-                    ]}
-                  >
-                    {s.label}
-                  </Text>
-                  <Text style={styles.speedOptionDesc}>{s.desc}</Text>
-                </View>
-                {active && <Text style={styles.activeCheck}>✓</Text>}
-              </Pressable>
-            );
-          })}
-        </View>
+      {/* Dealing speed */}
+      <View style={shared.card}>
+        <Text style={styles.title}>Dealing speed</Text>
+        <Text style={styles.sub}>How fast the 13 cards are dealt out</Text>
 
-        <Pressable
-          style={styles.testBtn}
-          onPress={handleTestSpreadSound}
-        >
-          <Text style={styles.testBtnText}>
-            ▶ Test Card Spread Sound & Vibration
-          </Text>
+        <Segmented
+          options={SPEED_OPTIONS}
+          value={speed}
+          onChange={(id) => apply({ spreadSpeed: id })}
+        />
+        <Text style={styles.hint}>
+          {SPEED_OPTIONS.find((s) => s.id === speed)?.desc}
+        </Text>
+
+        <Pressable style={styles.outlineBtn} onPress={handleTestSpreadSound}>
+          <Text style={styles.outlineBtnText}>Try the dealing sound</Text>
         </Pressable>
       </View>
 
-      {/* Audio & Sound Effects Management */}
+      {/* Sound */}
       <View style={shared.card}>
-        <Text style={styles.title}>🔊 Audio & Atmosphere Controls</Text>
-        <Text style={styles.sub}>
-          Real sound effects from assets/Card Spread sounds & assets/Sounds
-        </Text>
+        <Text style={styles.title}>Sound and vibration</Text>
 
-        {/* Master Sound Effects */}
         <View style={styles.switchRow}>
-          <View style={{ flex: 1, paddingRight: 12 }}>
-            <Text style={styles.switchLabel}>Master Sound Effects</Text>
+          <View style={styles.switchText}>
+            <Text style={styles.switchLabel}>Sound effects</Text>
             <Text style={styles.switchDesc}>
-              Enable or disable all card sounds, spreads, and audio cues
+              Turns every card sound on or off
             </Text>
           </View>
           <Switch
-            value={settings.soundEffects}
-            onValueChange={(v) => update("soundEffects", v)}
-            trackColor={{ false: C.border, true: C.emerald }}
-            thumbColor={settings.soundEffects ? C.bg : C.muted}
+            value={soundOn}
+            onValueChange={(v) => apply({ soundEffects: v })}
+            trackColor={{ false: c.border, true: c.success }}
+            thumbColor="#F5F5F0"
           />
         </View>
 
-        {/* Card Spread Sound */}
-        <View style={[styles.switchRow, styles.switchDivider]}>
-          <View style={{ flex: 1, paddingRight: 12 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={styles.switchLabel}>Card Spread Sound</Text>
+        <View
+          style={[
+            styles.switchRow,
+            styles.switchDivider,
+            !soundOn && styles.dimmed,
+          ]}
+        >
+          <View style={styles.switchText}>
+            <View style={styles.labelWithTest}>
+              <Text style={styles.switchLabel}>Dealing sound</Text>
               <Pressable
-                style={styles.smallTestPill}
+                style={styles.testPill}
                 onPress={handleTestSpreadSound}
+                disabled={!soundOn}
               >
-                <Text style={styles.smallTestPillText}>▶ Test</Text>
+                <Text style={styles.testPillText}>Test</Text>
               </Pressable>
             </View>
             <Text style={styles.switchDesc}>
-              Realistic deck spread audio when cards are dealt out on the table
+              The riffle you hear as cards are dealt
             </Text>
           </View>
           <Switch
             value={settings.spreadSound !== false}
-            onValueChange={(v) => update("spreadSound", v)}
-            trackColor={{ false: C.border, true: C.emerald }}
-            thumbColor={settings.spreadSound !== false ? C.bg : C.muted}
+            onValueChange={(v) => apply({ spreadSound: v })}
+            disabled={!soundOn}
+            trackColor={{ false: c.border, true: c.success }}
+            thumbColor="#F5F5F0"
           />
         </View>
 
-        {/* Card Move Sound */}
-        <View style={[styles.switchRow, styles.switchDivider]}>
-          <View style={{ flex: 1, paddingRight: 12 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={styles.switchLabel}>Card Move & Tap Sound</Text>
+        <View
+          style={[
+            styles.switchRow,
+            styles.switchDivider,
+            !soundOn && styles.dimmed,
+          ]}
+        >
+          <View style={styles.switchText}>
+            <View style={styles.labelWithTest}>
+              <Text style={styles.switchLabel}>Card taps and moves</Text>
               <Pressable
-                style={styles.smallTestPill}
+                style={styles.testPill}
                 onPress={handleTestPlaceSound}
+                disabled={!soundOn}
               >
-                <Text style={styles.smallTestPillText}>▶ Test</Text>
+                <Text style={styles.testPillText}>Test</Text>
               </Pressable>
             </View>
             <Text style={styles.switchDesc}>
-              Single card placement, sliding and selection clicks
+              Clicks when you pick up, slide or place a card
             </Text>
           </View>
           <Switch
             value={settings.cardMoveSound !== false}
-            onValueChange={(v) => update("cardMoveSound", v)}
-            trackColor={{ false: C.border, true: C.emerald }}
-            thumbColor={settings.cardMoveSound !== false ? C.bg : C.muted}
+            onValueChange={(v) => apply({ cardMoveSound: v })}
+            disabled={!soundOn}
+            trackColor={{ false: c.border, true: c.success }}
+            thumbColor="#F5F5F0"
           />
         </View>
 
-        {/* Haptic Vibration */}
         <View style={[styles.switchRow, styles.switchDivider]}>
-          <View style={{ flex: 1, paddingRight: 12 }}>
-            <Text style={styles.switchLabel}>Haptic Vibration</Text>
+          <View style={styles.switchText}>
+            <Text style={styles.switchLabel}>Vibration</Text>
             <Text style={styles.switchDesc}>
-              Physical vibration feedback on card selection, spread, and declarations
+              A small buzz when you select cards or declare
             </Text>
           </View>
           <Switch
             value={settings.vibration}
-            onValueChange={(v) => update("vibration", v)}
-            trackColor={{ false: C.border, true: C.emerald }}
-            thumbColor={settings.vibration ? C.bg : C.muted}
+            onValueChange={(v) => apply({ vibration: v })}
+            trackColor={{ false: c.border, true: c.success }}
+            thumbColor="#F5F5F0"
           />
         </View>
       </View>
 
-      {/* Background Music Configuration */}
+      {/* Music */}
       <View style={shared.card}>
-        <View style={styles.sectionHeaderRow}>
-          <View>
-            <Text style={styles.title}>🎵 Background Casino Music</Text>
-            <Text style={styles.sub}>
-              Select ambient soundtrack from assets/Sounds/
-            </Text>
+        <View style={styles.titleRow}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={styles.title}>Background music</Text>
+            <Text style={styles.sub}>Plays quietly while you play</Text>
           </View>
           <Pressable
-            style={[
-              styles.previewBtn,
-              previewingMusic && styles.previewBtnActive,
-            ]}
+            style={[styles.previewBtn, previewingMusic && styles.previewBtnOn]}
             onPress={handleToggleMusicPreview}
           >
-            <Text style={styles.previewBtnText}>
-              {previewingMusic ? "⏹ Stop Music" : "▶ Preview Music"}
+            <Text
+              style={[
+                styles.previewBtnText,
+                previewingMusic && { color: c.dangerText },
+              ]}
+            >
+              {previewingMusic ? "Stop" : "Listen"}
             </Text>
           </Pressable>
         </View>
 
-        <View style={{ gap: 8, marginTop: 4 }}>
+        <View style={{ gap: 8 }}>
           {MUSIC_TRACKS.map((m) => {
             const active =
               (settings.musicTrack || "sound1") === m.id &&
-              (m.id === "none" ? !settings.musicEnabled : settings.musicEnabled);
+              (m.id === "none"
+                ? !settings.musicEnabled
+                : settings.musicEnabled);
 
             return (
               <Pressable
                 key={m.id}
-                style={[styles.musicSelectCard, active && styles.musicSelectCardActive]}
-                onPress={() => {
-                  update("musicTrack", m.id as MusicTrackId);
-                  update("musicEnabled", m.id !== "none");
-                }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+                style={[styles.option, active && styles.optionOn]}
+                onPress={() => handlePickTrack(m.id as MusicTrackId)}
               >
                 <View style={{ flex: 1 }}>
                   <Text
-                    style={[
-                      styles.musicSelectLabel,
-                      active && styles.musicSelectLabelActive,
-                    ]}
+                    style={[styles.optionLabel, active && styles.optionLabelOn]}
                   >
-                    {m.id === "sound1"
-                      ? "🎷 Casino Lounge (sound1.mp3)"
-                      : m.id === "sound2"
-                        ? "🌃 Night Arena (sound2.mp3)"
-                        : "🔇 Mute Background Music"}
+                    {TRACK_NAMES[m.id] ?? m.id}
                   </Text>
-                  <Text style={styles.musicSelectDesc}>{m.description}</Text>
+                  <Text style={styles.optionDesc}>{m.description}</Text>
                 </View>
-                {active && <Text style={styles.activeCheck}>✓</Text>}
+                <View style={[styles.radio, active && styles.radioOn]}>
+                  {active && <View style={styles.radioDot} />}
+                </View>
               </Pressable>
             );
           })}
         </View>
       </View>
 
-      {/* Bot Tactical Difficulty */}
+      {/* Computer opponent */}
       <View style={shared.card}>
-        <Text style={styles.title}>🤖 Computer AI Difficulty</Text>
-        <Text style={styles.sub}>Default tactical algorithm for offline matches</Text>
-        <View style={styles.diffGrid}>
-          {[
-            { id: "easy", label: "🟢 Easy", desc: "Casual arrangement, perfect for learning" },
-            { id: "med", label: "🟡 Medium", desc: "Standard competitive AI with balanced play" },
-            { id: "hard", label: "🔴 Hard", desc: "Grandmaster AI: optimal Larra partitioning & bluffing" },
-          ].map((d) => {
-            const active = (settings.difficulty || "easy") === d.id;
-            return (
-              <Pressable
-                key={d.id}
-                style={[styles.diffCard, active && styles.diffCardActive]}
-                onPress={() => update("difficulty", d.id as any)}
-              >
-                <Text
-                  style={[
-                    styles.diffCardLabel,
-                    active && styles.diffCardLabelActive,
-                  ]}
-                >
-                  {d.label}
-                </Text>
-                <Text style={styles.diffCardDesc}>{d.desc}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <Text style={styles.title}>Computer opponent</Text>
+        <Text style={styles.sub}>Used in games you play offline</Text>
+
+        <Segmented
+          options={DIFFICULTY_OPTIONS}
+          value={difficulty as string}
+          onChange={(id) => apply({ difficulty: id as Difficulty })}
+        />
+        <Text style={styles.hint}>
+          {DIFFICULTY_OPTIONS.find((d) => d.id === difficulty)?.desc}
+        </Text>
       </View>
 
-      {/* Player Display Name */}
+      {/* Name */}
       <View style={shared.card}>
-        <Text style={styles.title}>👤 Player Display Name</Text>
-        <Text style={styles.sub}>Shown on the scoreboard and player seat</Text>
+        <Text style={styles.title}>Display name</Text>
+        <Text style={styles.sub}>Shown on the scoreboard and at your seat</Text>
         <TextInput
           style={styles.input}
           value={settings.playerName}
-          onChangeText={(t) => update("playerName", t)}
-          placeholder="Enter display name"
-          placeholderTextColor={C.dim}
+          onChangeText={(t) => apply({ playerName: t }, false)}
+          placeholder="Your name"
+          placeholderTextColor={c.textDim}
           maxLength={20}
         />
       </View>
 
-      <Pressable style={styles.reset} onPress={handleReset}>
-        <Text style={styles.resetText}>🔄 Reset All Settings to Factory Default</Text>
+      <Pressable
+        style={[styles.reset, confirmReset && styles.resetConfirm]}
+        onPress={handleReset}
+        accessibilityRole="button"
+      >
+        <Text style={[styles.resetText, confirmReset && { color: c.onAccent }]}>
+          {confirmReset
+            ? "Tap again to reset game settings"
+            : "Reset game settings"}
+        </Text>
       </Pressable>
+      <Text style={styles.footnote}>
+        Resetting keeps your light or dark choice.
+      </Text>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  headRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  saved: {
-    color: C.emerald,
-    fontSize: 12,
-    fontWeight: "900",
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.3)",
-  },
-  title: { color: C.white, fontSize: 15, fontWeight: "800" },
-  sub: { color: C.muted, fontSize: 11, marginTop: 2, marginBottom: 12 },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  speedGrid: {
-    gap: 8,
-  },
-  speedOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(2, 6, 23, 0.7)",
-    borderColor: C.border,
-    borderWidth: 1.5,
-    borderRadius: 12,
-    padding: 12,
-  },
-  speedOptionActive: {
-    borderColor: C.emerald,
-    backgroundColor: C.emeraldSoft,
-  },
-  speedOptionLabel: {
-    color: C.white,
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  speedOptionLabelActive: {
-    color: C.emeraldLight,
-  },
-  speedOptionDesc: {
-    color: C.muted,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  activeCheck: {
-    color: C.emeraldLight,
-    fontSize: 16,
-    fontWeight: "900",
-    marginLeft: 8,
-  },
-  testBtn: {
-    marginTop: 10,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.15)",
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  testBtnText: {
-    color: "#facc15",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  smallTestPill: {
-    backgroundColor: "rgba(250, 204, 21, 0.15)",
-    borderColor: "rgba(250, 204, 21, 0.4)",
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  smallTestPillText: {
-    color: "#facc15",
-    fontSize: 9,
-    fontWeight: "800",
-  },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-  },
-  switchDivider: {
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.08)",
-  },
-  switchLabel: { color: C.white, fontSize: 13, fontWeight: "700" },
-  switchDesc: { color: C.muted, fontSize: 11, marginTop: 2 },
-  previewBtn: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.25)",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  previewBtnActive: {
-    backgroundColor: "rgba(239, 68, 68, 0.25)",
-    borderColor: "#ef4444",
-  },
-  previewBtnText: {
-    color: "#f8fafc",
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  musicSelectCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(2, 6, 23, 0.7)",
-    borderColor: C.border,
-    borderWidth: 1.5,
-    borderRadius: 12,
-    padding: 12,
-  },
-  musicSelectCardActive: {
-    borderColor: C.amber,
-    backgroundColor: C.amberSoft,
-  },
-  musicSelectLabel: {
-    color: C.white,
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  musicSelectLabelActive: {
-    color: C.amberLight,
-  },
-  musicSelectDesc: {
-    color: C.muted,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  diffGrid: {
-    gap: 8,
-  },
-  diffCard: {
-    backgroundColor: "rgba(2, 6, 23, 0.8)",
-    borderColor: C.border,
-    borderWidth: 1.5,
-    borderRadius: 12,
-    padding: 12,
-  },
-  diffCardActive: {
-    borderColor: C.emerald,
-    backgroundColor: C.emeraldSoft,
-  },
-  diffCardLabel: {
-    color: C.white,
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  diffCardLabelActive: {
-    color: C.emeraldLight,
-  },
-  diffCardDesc: {
-    color: C.muted,
-    fontSize: 10,
-    marginTop: 2,
-  },
-  input: {
-    backgroundColor: C.bg,
-    borderColor: C.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    color: C.white,
-    fontSize: 14,
-    fontWeight: "700",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  reset: {
-    backgroundColor: C.roseSoft,
-    borderColor: "rgba(244, 63, 94, 0.3)",
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  resetText: { color: "#fda4af", fontSize: 13, fontWeight: "800" },
-});
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    headRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    savedPill: {
+      backgroundColor: c.successSoft,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    savedText: { color: c.successText, fontSize: 12, fontWeight: "700" },
+
+    title: { color: c.text, fontSize: 16, fontWeight: "800" },
+    sub: { color: c.textMuted, fontSize: 13, marginTop: 2, marginBottom: 12 },
+    hint: { color: c.textMuted, fontSize: 13, marginTop: 10 },
+    titleRow: { flexDirection: "row", alignItems: "flex-start" },
+
+    outlineBtn: {
+      marginTop: 14,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 12,
+      paddingVertical: 11,
+      alignItems: "center",
+    },
+    outlineBtnText: { color: c.accentText, fontSize: 13, fontWeight: "700" },
+
+    switchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 12,
+    },
+    switchText: { flex: 1, paddingRight: 12 },
+    switchDivider: { borderTopWidth: 1, borderTopColor: c.border },
+    switchLabel: { color: c.text, fontSize: 14, fontWeight: "700" },
+    switchDesc: { color: c.textMuted, fontSize: 12, marginTop: 2 },
+    dimmed: { opacity: 0.45 },
+    labelWithTest: { flexDirection: "row", alignItems: "center", gap: 8 },
+    testPill: {
+      backgroundColor: c.accentSoft,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+    },
+    testPillText: { color: c.accentText, fontSize: 11, fontWeight: "700" },
+
+    previewBtn: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 999,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+    },
+    previewBtnOn: { borderColor: c.danger, backgroundColor: c.dangerSoft },
+    previewBtnText: { color: c.text, fontSize: 12, fontWeight: "700" },
+
+    option: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: c.bg,
+      borderColor: c.border,
+      borderWidth: 1.5,
+      borderRadius: 12,
+      padding: 12,
+    },
+    optionOn: { borderColor: c.accent, backgroundColor: c.accentSoft },
+    optionLabel: { color: c.text, fontSize: 14, fontWeight: "700" },
+    optionLabelOn: { color: c.accentText },
+    optionDesc: { color: c.textMuted, fontSize: 12, marginTop: 2 },
+    radio: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: c.border,
+      alignItems: "center",
+      justifyContent: "center",
+      marginLeft: 10,
+    },
+    radioOn: { borderColor: c.accent },
+    radioDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: c.accent,
+    },
+
+    input: {
+      backgroundColor: c.bg,
+      borderColor: c.border,
+      borderWidth: 1,
+      borderRadius: 12,
+      color: c.text,
+      fontSize: 15,
+      fontWeight: "600",
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+    },
+
+    reset: {
+      borderColor: c.danger,
+      borderWidth: 1.5,
+      borderRadius: 14,
+      paddingVertical: 14,
+      alignItems: "center",
+    },
+    resetConfirm: { backgroundColor: c.danger },
+    resetText: { color: c.dangerText, fontSize: 14, fontWeight: "700" },
+    footnote: {
+      color: c.textDim,
+      fontSize: 12,
+      textAlign: "center",
+      marginTop: -4,
+    },
+  });

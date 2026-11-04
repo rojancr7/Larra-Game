@@ -2,58 +2,54 @@ import { Tabs } from "expo-router";
 import type { LucideIcon } from "lucide-react-native";
 import { Clock, Home, Settings, ShoppingBag, User } from "lucide-react-native";
 import { useMemo } from "react";
-import { Platform, useWindowDimensions, View } from "react-native";
+import { Platform, View } from "react-native";
+import type { ColorValue } from "react-native";
 import { TopBar } from "../components/TopBar";
-import { C } from "../theme/appTheme";
+import { useTheme } from "../theme/appTheme";
 
 const MAX_BAR_WIDTH = 640; // tab bar width on laptop / desktop
-const WIDE_BREAKPOINT = 768; // tablet / laptop
 
 const tabIcon =
   (Icon: LucideIcon) =>
-  ({ color, focused }: { color: unknown; size: number; focused: boolean }) => (
+  ({ color, focused }: { color: ColorValue | null; size: number; focused: boolean }) => (
     <Icon size={22} color={String(color)} strokeWidth={focused ? 2.5 : 1.8} />
   );
 
 export default function TabsLayout() {
-  const { width } = useWindowDimensions();
-  const isWide = width >= WIDE_BREAKPOINT;
+  const { c, isWide } = useTheme();
 
-  const tabBarStyle = useMemo(() => {
-    // Center the bar and keep it from stretching across a huge screen
-    const sideMargin = isWide ? Math.max(0, (width - MAX_BAR_WIDTH) / 2) : 0;
-
-    return {
-      backgroundColor: "rgba(15, 23, 42, 0.97)",
-      borderTopColor: C.border,
+  const tabBarStyle = useMemo(
+    () => ({
+      backgroundColor: c.surface,
+      borderTopColor: c.border,
       borderTopWidth: isWide ? 0 : 1,
       height: isWide ? 68 : Platform.OS === "ios" ? 84 : 64,
       paddingTop: 6,
       paddingBottom: isWide ? 8 : Platform.OS === "ios" ? 24 : 8,
-      marginHorizontal: sideMargin,
+      // Floating, centered bar on laptops
+      alignSelf: "center" as const,
+      width: "100%" as const,
+      maxWidth: isWide ? MAX_BAR_WIDTH : undefined,
       marginBottom: isWide ? 12 : 0,
       borderRadius: isWide ? 22 : 0,
       borderWidth: isWide ? 1 : 0,
-      borderColor: C.border,
+      borderColor: c.border,
       overflow: "hidden" as const,
-    };
-  }, [isWide, width]);
+    }),
+    [isWide, c],
+  );
 
   return (
-    // Same background behind the floating bar on wide screens
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Tabs
         screenOptions={{
           header: () => <TopBar />,
-          tabBarActiveTintColor: C.amber,
-          tabBarInactiveTintColor: C.muted,
-
-          // KEY FIX: stops the "icons stuck on one side" layout on wide screens
+          tabBarActiveTintColor: c.accent,
+          tabBarInactiveTintColor: c.textMuted,
           tabBarLabelPosition: "below-icon",
-
           tabBarStyle,
           tabBarItemStyle: {
-            flex: 1, // every tab gets equal width
+            flex: 1,
             alignItems: "center",
             justifyContent: "center",
           },
@@ -62,7 +58,7 @@ export default function TabsLayout() {
             fontWeight: "700",
             marginTop: 2,
           },
-          sceneStyle: { backgroundColor: C.bg },
+          sceneStyle: { backgroundColor: c.bg },
         }}
       >
         <Tabs.Screen

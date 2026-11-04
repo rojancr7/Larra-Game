@@ -1,5 +1,5 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import {
   Pressable,
@@ -11,7 +11,7 @@ import {
 } from "react-native";
 
 import { triggerHaptic } from "../../src/services/audioHaptics";
-import { C, shared } from '../theme/appTheme';
+import { Palette, useTheme } from "../theme/appTheme";
 
 import {
   AVATAR_PRESETS,
@@ -23,6 +23,9 @@ import {
 import type { PlayerProfile } from "../../src/services/storage";
 
 export default function ProfileScreen() {
+  const { c, shared } = useTheme();
+  const styles = useMemo(() => makeStyles(c), [c]);
+
   const [profile, setProfile] = useState<PlayerProfile>(DEFAULT_PROFILE);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
@@ -30,14 +33,13 @@ export default function ProfileScreen() {
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load profile whenever this screen becomes active
+  // Reload whenever this tab comes into view
   useFocusEffect(
     useCallback(() => {
       let active = true;
 
       loadProfile().then((p) => {
         if (!active) return;
-
         setProfile(p);
         setNameInput(p.name);
       });
@@ -49,90 +51,83 @@ export default function ProfileScreen() {
     }, []),
   );
 
-  // Show saved message
   const flashSaved = () => {
     setSaved(true);
-
-    if (timer.current) {
-      clearTimeout(timer.current);
-    }
-
-    timer.current = setTimeout(() => {
-      setSaved(false);
-    }, 1500);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSaved(false), 1500);
   };
 
-  // Update and save profile
   const update = (patch: Partial<PlayerProfile>) => {
     const next = { ...profile, ...patch };
-
     setProfile(next);
     saveProfile(next);
     flashSaved();
   };
 
-  // Calculate win rate
   const winRate =
     profile.matchesPlayed > 0
       ? Math.round((profile.matchesWon / profile.matchesPlayed) * 100)
       : 0;
 
-  // Selected avatar
   const avatar =
     AVATAR_PRESETS.find((a) => a.id === profile.avatar) || AVATAR_PRESETS[0];
 
-  // Player statistics
   const stats = [
     {
       label: "Win rate",
       value: `${winRate}%`,
-      sub: `${profile.matchesWon} wins / ${profile.matchesPlayed} games`,
-      color: C.amber,
+      sub: `${profile.matchesWon} won of ${profile.matchesPlayed} played`,
+      color: c.accent,
     },
     {
       label: "Total points",
       value: `${profile.totalPoints}`,
-      sub: "Across all matches",
-      color: C.emerald,
+      sub: "From all matches",
+      color: c.success,
     },
     {
       label: "Clean sweeps",
       value: `${profile.cleanSweeps}`,
-      sub: "Round 1 sweeps",
-      color: C.indigo,
+      sub: "Won round 1 outright",
+      color: c.info,
     },
     {
-      label: "Instant victories",
+      label: "Instant wins",
       value: `${profile.instantVictories}`,
-      sub: "Declared hands",
-      color: C.purple,
+      sub: "Won by declaring a hand",
+      color: c.purple,
     },
   ];
 
-  // Badges earned from player statistics
   const badges = [
     {
       icon: "🎴",
       title: "First win",
       desc: "Win your first match",
-      tint: C.amberSoft,
+      tint: c.accentSoft,
       earned: profile.matchesWon >= 1,
     },
     {
       icon: "⚡",
       title: "Clean sweeper",
-      desc: "Score a Round 1 clean sweep",
-      tint: C.emeraldSoft,
+      desc: "Sweep round 1",
+      tint: c.successSoft,
       earned: profile.cleanSweeps >= 1,
     },
     {
       icon: "👑",
       title: "Instant victor",
-      desc: "Win with an instant hand",
-      tint: C.purpleSoft,
+      desc: "Win with a declared hand",
+      tint: c.purpleSoft,
       earned: profile.instantVictories >= 1,
     },
   ];
+
+  const saveName = () => {
+    triggerHaptic("selection");
+    update({ name: nameInput.trim() || "Player 1" });
+    setEditingName(false);
+  };
 
   return (
     <ScrollView
@@ -140,17 +135,20 @@ export default function ProfileScreen() {
       contentContainerStyle={shared.content}
       keyboardShouldPersistTaps="handled"
     >
-      {/* Header */}
       <View style={styles.headRow}>
         <View>
-          <Text style={shared.pageTitle}>Player profile</Text>
-          <Text style={shared.pageSub}>Saved on this device</Text>
+          <Text style={shared.pageTitle}>Your profile</Text>
+          <Text style={shared.pageSub}>Stored on this device only</Text>
         </View>
 
-        {saved && <Text style={styles.saved}>Saved ✓</Text>}
+        {saved && (
+          <View style={styles.savedPill}>
+            <Text style={styles.savedText}>Saved</Text>
+          </View>
+        )}
       </View>
 
-      {/* Profile card */}
+      {/* Avatar and name */}
       <View style={[shared.card, styles.hero]}>
         <View
           style={[styles.bigAvatar, { backgroundColor: avatar.color + "33" }]}
@@ -160,30 +158,23 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        {/* Edit player name */}
         {editingName ? (
           <View style={styles.editRow}>
             <TextInput
               style={styles.nameInput}
               value={nameInput}
               onChangeText={setNameInput}
+              onSubmitEditing={saveName}
               maxLength={20}
               autoFocus
-              placeholder="Player name"
-              placeholderTextColor={C.muted}
+              returnKeyType="done"
+              placeholder="Your name"
+              placeholderTextColor={c.textDim}
             />
-
             <Pressable
               style={styles.saveBtn}
-              onPress={() => {
-                triggerHaptic("selection");
-
-                update({
-                  name: nameInput.trim() || "Player 1",
-                });
-
-                setEditingName(false);
-              }}
+              onPress={saveName}
+              accessibilityRole="button"
             >
               <Text style={styles.saveBtnText}>Save</Text>
             </Pressable>
@@ -191,20 +182,24 @@ export default function ProfileScreen() {
         ) : (
           <Pressable
             style={styles.nameRow}
+            accessibilityRole="button"
+            accessibilityLabel="Change your name"
             onPress={() => {
               setNameInput(profile.name);
               setEditingName(true);
             }}
           >
             <Text style={styles.name}>{profile.name}</Text>
-            <Text>✏️</Text>
+            <View style={styles.editChip}>
+              <Text style={styles.editChipText}>Edit</Text>
+            </View>
           </Pressable>
         )}
 
-        <Text style={styles.id}>ID {profile.playerId}</Text>
+        <Text style={styles.id}>Player ID {profile.playerId}</Text>
       </View>
 
-      {/* Statistics */}
+      {/* Stats */}
       <View style={styles.grid}>
         {stats.map((s) => (
           <View
@@ -212,23 +207,21 @@ export default function ProfileScreen() {
             style={[shared.card, styles.stat, { borderLeftColor: s.color }]}
           >
             <Text style={styles.statLabel}>{s.label}</Text>
-
             <Text style={styles.statValue}>{s.value}</Text>
-
-            <Text style={[styles.statSub, { color: s.color }]}>{s.sub}</Text>
+            <Text style={styles.statSub}>{s.sub}</Text>
           </View>
         ))}
       </View>
 
       {/* Badges */}
       <View style={shared.card}>
-        <Text style={styles.sectionTitle}>🏅 Trophies & badges</Text>
+        <Text style={styles.sectionTitle}>Badges</Text>
 
         <View style={{ gap: 10 }}>
           {badges.map((b) => (
             <View
               key={b.title}
-              style={[styles.badge, !b.earned && { opacity: 0.4 }]}
+              style={[styles.badge, !b.earned && { opacity: 0.5 }]}
             >
               <View style={[styles.badgeIcon, { backgroundColor: b.tint }]}>
                 <Text style={{ fontSize: 18 }}>{b.icon}</Text>
@@ -236,9 +229,8 @@ export default function ProfileScreen() {
 
               <View style={{ flex: 1 }}>
                 <Text style={styles.badgeTitle}>{b.title}</Text>
-
                 <Text style={styles.badgeDesc}>
-                  {b.earned ? b.desc : `Locked · ${b.desc}`}
+                  {b.earned ? b.desc : `Locked: ${b.desc}`}
                 </Text>
               </View>
             </View>
@@ -248,7 +240,7 @@ export default function ProfileScreen() {
 
       {/* Avatar picker */}
       <View style={shared.card}>
-        <Text style={styles.sectionTitle}>👑 Choose avatar</Text>
+        <Text style={styles.sectionTitle}>Pick an avatar</Text>
 
         <View style={styles.avatarGrid}>
           {AVATAR_PRESETS.map((av) => {
@@ -257,15 +249,23 @@ export default function ProfileScreen() {
             return (
               <Pressable
                 key={av.id}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
                 style={[styles.avatarItem, active && styles.avatarItemActive]}
                 onPress={() => {
                   triggerHaptic("selection");
                   update({ avatar: av.id });
                 }}
               >
-                <Text style={{ fontSize: 22 }}>{av.label.split(" ")[0]}</Text>
-
-                <Text style={styles.avatarLabel}>{av.label.split(" ")[1]}</Text>
+                <Text style={{ fontSize: 24 }}>{av.label.split(" ")[0]}</Text>
+                <Text
+                  style={[
+                    styles.avatarLabel,
+                    active && { color: c.accentText },
+                  ]}
+                >
+                  {av.label.split(" ")[1]}
+                </Text>
               </Pressable>
             );
           })}
@@ -275,185 +275,131 @@ export default function ProfileScreen() {
   );
 }
 
-// Profile screen styles
-const styles = StyleSheet.create({
-  headRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    headRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
 
-  saved: {
-    color: C.emerald,
-    fontSize: 12,
-    fontWeight: "800",
-  },
+    savedPill: {
+      backgroundColor: c.successSoft,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    savedText: { color: c.successText, fontSize: 12, fontWeight: "700" },
 
-  hero: {
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 22,
-  },
+    hero: { alignItems: "center", gap: 10, paddingVertical: 24 },
 
-  bigAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
-    borderColor: C.amber,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    bigAvatar: {
+      width: 84,
+      height: 84,
+      borderRadius: 42,
+      borderWidth: 2,
+      borderColor: c.accent,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    bigAvatarEmoji: { fontSize: 42 },
 
-  bigAvatarEmoji: {
-    fontSize: 40,
-  },
+    nameRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+    name: { color: c.text, fontSize: 22, fontWeight: "800" },
+    editChip: {
+      backgroundColor: c.inset,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+    },
+    editChipText: { color: c.textMuted, fontSize: 11, fontWeight: "700" },
 
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
+    editRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    nameInput: {
+      backgroundColor: c.bg,
+      borderColor: c.accent,
+      borderWidth: 1.5,
+      borderRadius: 12,
+      color: c.text,
+      fontSize: 16,
+      fontWeight: "700",
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      minWidth: 170,
+      textAlign: "center",
+    },
+    saveBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 11,
+    },
+    saveBtnText: { color: c.onAccent, fontSize: 13, fontWeight: "800" },
 
-  name: {
-    color: C.white,
-    fontSize: 20,
-    fontWeight: "800",
-  },
+    id: { color: c.textDim, fontSize: 12 },
 
-  editRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
+    grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+    stat: {
+      flexBasis: "47%",
+      flexGrow: 1,
+      borderLeftWidth: 4,
+      padding: 14,
+    },
+    statLabel: { color: c.textMuted, fontSize: 13 },
+    statValue: {
+      color: c.text,
+      fontSize: 26,
+      fontWeight: "800",
+      marginTop: 4,
+    },
+    statSub: { color: c.textDim, fontSize: 12, marginTop: 2 },
 
-  nameInput: {
-    backgroundColor: C.bg,
-    borderColor: C.amber,
-    borderWidth: 1,
-    borderRadius: 10,
-    color: C.white,
-    fontSize: 16,
-    fontWeight: "700",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    minWidth: 150,
-    textAlign: "center",
-  },
+    sectionTitle: {
+      color: c.text,
+      fontSize: 16,
+      fontWeight: "800",
+      marginBottom: 12,
+    },
 
-  saveBtn: {
-    backgroundColor: C.amber,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
+    badge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      backgroundColor: c.bg,
+      borderColor: c.border,
+      borderWidth: 1,
+      borderRadius: 14,
+      padding: 12,
+    },
+    badgeIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    badgeTitle: { color: c.text, fontSize: 14, fontWeight: "700" },
+    badgeDesc: { color: c.textMuted, fontSize: 12, marginTop: 1 },
 
-  saveBtnText: {
-    color: C.bg,
-    fontSize: 12,
-    fontWeight: "800",
-  },
-
-  id: {
-    color: C.muted,
-    fontSize: 11,
-    fontFamily: "monospace",
-  },
-
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-
-  stat: {
-    width: "47.5%",
-    flexGrow: 1,
-    borderLeftWidth: 4,
-    padding: 14,
-  },
-
-  statLabel: {
-    color: C.muted,
-    fontSize: 12,
-  },
-
-  statValue: {
-    color: C.white,
-    fontSize: 22,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-
-  statSub: {
-    fontSize: 10,
-    marginTop: 2,
-  },
-
-  sectionTitle: {
-    color: C.white,
-    fontSize: 15,
-    fontWeight: "800",
-    marginBottom: 12,
-  },
-
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: "rgba(2, 6, 23, 0.8)",
-    borderColor: C.border,
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 12,
-  },
-
-  badgeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  badgeTitle: {
-    color: C.white,
-    fontSize: 13,
-    fontWeight: "800",
-  },
-
-  badgeDesc: {
-    color: C.muted,
-    fontSize: 11,
-    marginTop: 1,
-  },
-
-  avatarGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-
-  avatarItem: {
-    width: "22%",
-    aspectRatio: 1,
-    backgroundColor: "rgba(2, 6, 23, 0.8)",
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: C.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  avatarItemActive: {
-    borderColor: C.amber,
-    backgroundColor: C.amberSoft,
-  },
-
-  avatarLabel: {
-    color: "#cbd5e1",
-    fontSize: 9,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-});
+    avatarGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+    avatarItem: {
+      width: "22%",
+      flexGrow: 1,
+      minWidth: 68,
+      maxWidth: 110,
+      aspectRatio: 1,
+      backgroundColor: c.bg,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: c.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarItemActive: { borderColor: c.accent, backgroundColor: c.accentSoft },
+    avatarLabel: {
+      color: c.textMuted,
+      fontSize: 11,
+      fontWeight: "600",
+      marginTop: 2,
+    },
+  });
