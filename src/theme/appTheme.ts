@@ -1,77 +1,125 @@
-// import { Platform, StyleSheet } from "react-native";
+import { Tabs } from "expo-router";
+import type { LucideIcon } from "lucide-react-native";
+import { Clock, Home, Settings, ShoppingBag, User } from "lucide-react-native";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
+import type { ViewStyle } from "react-native";
+import { Platform, useWindowDimensions, View } from "react-native";
+import { TopBar } from "../components/TopBar";
 
-// // Palette 8: #1A1A1F · #2D2B55 · #6A5ACD · #A678B9 · #F0D9B5 · #F4A62A
-// export const C = {
-//   bg: "#1A1A1F", // near-black
-//   surface: "#2D2B55", // deep indigo
-//   surfaceAlt: "rgba(45, 43, 85, 0.65)",
-//   border: "#3F3C75", // surface lightened slightly for visible borders
-//   borderSoft: "rgba(240, 217, 181, 0.1)",
-//   text: "#F0D9B5", // cream
-//   white: "#F0D9B5", // primary text
-//   muted: "#B9A9CF", // orchid lightened for small-text contrast
-//   dim: "#8A7FA8",
+type ThemeColors = {
+  bg: string;
+  surface: string;
+  border: string;
+  accent: string;
+  textMuted: string;
+};
 
-//   // Mode 2 accent (friends): amber
-//   amber: "#F4A62A",
-//   amberLight: "#F0D9B5",
-//   amberSoft: "rgba(244, 166, 42, 0.15)",
-//   amberLine: "rgba(244, 166, 42, 0.4)",
+const colors: ThemeColors = {
+  bg: "#0f172a",
+  surface: "#1e293b",
+  border: "#334155",
+  accent: "#38bdf8",
+  textMuted: "#94a3b8",
+};
 
-//   // Mode 1 accent (offline): orchid
-//   emerald: "#A678B9",
-//   emeraldLight: "#D9B8E6",
-//   emeraldSoft: "rgba(166, 120, 185, 0.22)",
+const ThemeContext = createContext({ c: colors, isWide: false });
 
-//   // Mode 3 accent (quick match): slate blue
-//   indigo: "#6A5ACD",
-//   indigoLight: "#C3B9F0",
-//   indigoSoft: "rgba(106, 90, 205, 0.25)",
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const { width } = useWindowDimensions();
+  const value = useMemo(() => ({ c: colors, isWide: width >= 768 }), [width]);
 
-//   rose: "#E5646E", // kept warm red so errors and losses still read
-//   roseSoft: "rgba(229, 100, 110, 0.18)",
-//   purple: "#A678B9",
-//   purpleSoft: "rgba(166, 120, 185, 0.18)",
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
+}
 
-//   // New tokens used by HomeScreen
-//   banner: "#4A3F99", // #6A5ACD darkened so text on it stays readable
-//   stone: "rgba(26, 26, 31, 0.8)",
-//   backdrop: "rgba(26, 26, 31, 0.9)",
-//   activeBorder: "rgba(166, 120, 185, 0.7)",
-// };
+export function useTheme() {
+  return useContext(ThemeContext);
+}
 
-// export const serif = Platform.select({
-//   ios: "Georgia",
-//   android: "serif",
-//   default: "serif",
-// }) as string;
+const MAX_BAR_WIDTH = 640; // tab bar width on laptop / desktop
 
-// // Styles reused by every tab
-// export const shared = StyleSheet.create({
-//   screen: { flex: 1, backgroundColor: C.bg },
-//   content: {
-//     padding: 16,
-//     paddingBottom: 32,
-//     gap: 14,
-//     width: "100%",
-//     maxWidth: 720,
-//     alignSelf: "center",
-//   },
-//   card: {
-//     backgroundColor: C.surfaceAlt,
-//     borderRadius: 20,
-//     borderWidth: 1,
-//     borderColor: C.borderSoft,
-//     padding: 16,
-//   },
-//   pageTitle: { color: C.white, fontSize: 18, fontWeight: "800" },
-//   pageSub: { color: C.muted, fontSize: 12, marginTop: 2 },
-//   sectionLabel: {
-//     color: C.muted,
-//     fontSize: 12,
-//     fontWeight: "800",
-//     marginBottom: 8,
-//   },
-// });
+const tabIcon =
+  (Icon: LucideIcon) =>
+  ({ color, focused }: { color: unknown; size: number; focused: boolean }) => (
+    <Icon
+      size={22}
+      color={typeof color === "string" ? color : undefined}
+      strokeWidth={focused ? 2.5 : 1.8}
+    />
+  );
 
+function TabsInner() {
+  const { c, isWide } = useTheme();
 
+  const tabBarStyle = useMemo<ViewStyle>(
+    () => ({
+      backgroundColor: c.surface,
+      borderTopColor: c.border,
+      borderTopWidth: isWide ? 0 : 1,
+      height: isWide ? 68 : Platform.OS === "ios" ? 84 : 64,
+      paddingTop: 6,
+      paddingBottom: isWide ? 8 : Platform.OS === "ios" ? 24 : 8,
+      // Floating, centered bar on laptops
+      alignSelf: "center",
+      width: "100%",
+      maxWidth: isWide ? MAX_BAR_WIDTH : undefined,
+      marginBottom: isWide ? 12 : 0,
+      borderRadius: isWide ? 22 : 0,
+      borderWidth: isWide ? 1 : 0,
+      borderColor: c.border,
+      overflow: "hidden",
+    }),
+    [isWide, c]
+  );
+
+  return (
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <Tabs
+        screenOptions={{
+          header: () => <TopBar />,
+          tabBarActiveTintColor: c.accent,
+          tabBarInactiveTintColor: c.textMuted,
+          tabBarLabelPosition: "below-icon",
+          tabBarStyle,
+          tabBarItemStyle: {
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+          },
+          tabBarLabelStyle: {
+            fontSize: isWide ? 12 : 11,
+            fontWeight: "700",
+            marginTop: 2,
+          },
+          sceneStyle: { backgroundColor: c.bg },
+        }}
+      >
+        <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: tabIcon(Home) }} />
+        <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: tabIcon(User) }} />
+        <Tabs.Screen name="history" options={{ title: "History", tabBarIcon: tabIcon(Clock) }} />
+        <Tabs.Screen name="store" options={{ title: "Store", tabBarIcon: tabIcon(ShoppingBag) }} />
+        <Tabs.Screen name="settings" options={{ title: "Settings", tabBarIcon: tabIcon(Settings) }} />
+        {/* Hidden routes (not shown in the tab bar) */}
+        <Tabs.Screen
+          name="game"
+          options={{
+            href: null,
+            tabBarStyle: { display: "none" },
+            headerShown: false,
+          }}
+        />
+        <Tabs.Screen name="online" options={{ href: null, headerShown: false }} />
+      </Tabs>
+    </View>
+  );
+}
+
+// Root of the app: the provider has to sit ABOVE anything that calls useTheme()
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <TabsInner />
+    </ThemeProvider>
+  );
+}
