@@ -26,7 +26,7 @@ import {
   resetSettings,
   saveSettings,
 } from "../services/storage";
-import { Palette, ThemeMode, useTheme } from "../theme/appThemee";
+import { Palette, ThemeMode, useTheme } from "../theme/appTheme";
 
 type Difficulty = GameSettings["difficulty"];
 

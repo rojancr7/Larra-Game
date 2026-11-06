@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 
-import { triggerHaptic } from "../../src/services/audioHaptics";
+import { triggerHaptic } from "../services/audioHaptics";
 import { Palette, useTheme } from "../theme/appTheme";
 
 import {
@@ -18,9 +18,9 @@ import {
   DEFAULT_PROFILE,
   loadProfile,
   saveProfile,
-} from "../../src/services/storage";
+} from "../services/storage";
 
-import type { PlayerProfile } from "../../src/services/storage";
+import type { PlayerProfile } from "../services/storage";
 
 export default function ProfileScreen() {
   const { c, shared } = useTheme();

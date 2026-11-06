@@ -5,17 +5,24 @@ import { useMemo } from "react";
 import { Platform, View } from "react-native";
 import type { ColorValue } from "react-native";
 import { TopBar } from "../components/TopBar";
-import { useTheme } from "../theme/appTheme";
+import { ThemeProvider, useTheme } from "../theme/appTheme";
 
 const MAX_BAR_WIDTH = 640; // tab bar width on laptop / desktop
 
 const tabIcon =
   (Icon: LucideIcon) =>
-  ({ color, focused }: { color: ColorValue | null; size: number; focused: boolean }) => (
+  ({
+    color,
+    focused,
+  }: {
+    color: ColorValue | null;
+    size: number;
+    focused: boolean;
+  }) => (
     <Icon size={22} color={String(color)} strokeWidth={focused ? 2.5 : 1.8} />
   );
 
-export default function TabsLayout() {
+function TabsLayout() {
   const { c, isWide } = useTheme();
 
   const tabBarStyle = useMemo(
@@ -26,7 +33,6 @@ export default function TabsLayout() {
       height: isWide ? 68 : Platform.OS === "ios" ? 84 : 64,
       paddingTop: 6,
       paddingBottom: isWide ? 8 : Platform.OS === "ios" ? 24 : 8,
-      // Floating, centered bar on laptops
       alignSelf: "center" as const,
       width: "100%" as const,
       maxWidth: isWide ? MAX_BAR_WIDTH : undefined,
@@ -97,5 +103,14 @@ export default function TabsLayout() {
         />
       </Tabs>
     </View>
+  );
+}
+
+/** Root layout – ThemeProvider must sit above everything that calls useTheme(). */
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <TabsLayout />
+    </ThemeProvider>
   );
 }
