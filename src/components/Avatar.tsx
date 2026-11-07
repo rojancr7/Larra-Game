@@ -36,7 +36,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   useEffect(() => setCustomFailed(false), [avatarFile]);
 
   const customUri = avatarFileToUri(avatarFile);
-  const useEmojiFallback = !avatar && !customUri && !!emoji;
+  const useEmojiFallback = false; // always show an image
   const preset = getAvatarPreset(avatar ?? "king");
   const tint = color ?? preset.color;
 

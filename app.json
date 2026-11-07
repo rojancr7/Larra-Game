@@ -18,7 +18,18 @@
     "web": {
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": ["expo-router", "expo-audio", "expo-asset"],
+    "plugins": [
+      "expo-router",
+      "expo-audio",
+      "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow access to your photos to set a profile picture.",
+          "cameraPermission": "Allow camera access to take a profile picture."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     }

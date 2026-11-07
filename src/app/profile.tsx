@@ -2,6 +2,9 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import {
+  ActivityIndicator,
+  Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,8 +13,10 @@ import {
   View,
 } from "react-native";
 
+import Avatar from "../components/Avatar";
 import { triggerHaptic } from "../services/audioHaptics";
 import { Palette, useTheme } from "../theme/appTheme";
+import { deleteCustomAvatar, pickCustomAvatar } from "../utils/avatarStorage";
 
 import {
   AVATAR_PRESETS,
@@ -30,6 +35,7 @@ export default function ProfileScreen() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -64,13 +70,60 @@ export default function ProfileScreen() {
     flashSaved();
   };
 
+  // ---- Avatar actions -----------------------------------------------------
+
+  const selectPreset = async (id: string) => {
+    triggerHaptic("selection");
+    const oldFile = profile.avatarFile;
+    update({ avatar: id, avatarFile: undefined });
+    await deleteCustomAvatar(oldFile);
+  };
+
+  const uploadPhoto = async (source: "gallery" | "camera") => {
+    setBusy(true);
+    const result = await pickCustomAvatar(source);
+    setBusy(false);
+
+    if (result.ok) {
+      const oldFile = profile.avatarFile;
+      update({ avatarFile: result.fileName });
+      await deleteCustomAvatar(oldFile);
+      return;
+    }
+
+    if (result.reason === "permission") {
+      Alert.alert(
+        "Permission needed",
+        `Allow ${source === "camera" ? "camera" : "photo"} access in Settings to use your own picture.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Open settings", onPress: () => Linking.openSettings() },
+        ],
+      );
+    } else if (result.reason === "error") {
+      Alert.alert("Could not save photo", "Please try a different picture.");
+    }
+  };
+
+  const chooseSource = () =>
+    Alert.alert("Upload your photo", "Your photo stays on this device only.", [
+      { text: "Choose from gallery", onPress: () => uploadPhoto("gallery") },
+      { text: "Take a photo", onPress: () => uploadPhoto("camera") },
+      { text: "Cancel", style: "cancel" },
+    ]);
+
+  const removePhoto = async () => {
+    const oldFile = profile.avatarFile;
+    update({ avatarFile: undefined });
+    await deleteCustomAvatar(oldFile);
+  };
+
+  // ---- Derived data -------------------------------------------------------
+
   const winRate =
     profile.matchesPlayed > 0
       ? Math.round((profile.matchesWon / profile.matchesPlayed) * 100)
       : 0;
-
-  const avatar =
-    AVATAR_PRESETS.find((a) => a.id === profile.avatar) || AVATAR_PRESETS[0];
 
   const stats = [
     {
@@ -150,12 +203,38 @@ export default function ProfileScreen() {
 
       {/* Avatar and name */}
       <View style={[shared.card, styles.hero]}>
-        <View
-          style={[styles.bigAvatar, { backgroundColor: avatar.color + "33" }]}
-        >
-          <Text style={styles.bigAvatarEmoji}>
-            {avatar.label.split(" ")[0]}
-          </Text>
+        <Avatar
+          avatar={profile.avatar}
+          avatarFile={profile.avatarFile}
+          size={110}
+          highlight
+        />
+
+        <View style={styles.photoRow}>
+          <Pressable
+            style={styles.photoBtn}
+            onPress={chooseSource}
+            disabled={busy}
+            accessibilityRole="button"
+          >
+            {busy ? (
+              <ActivityIndicator color={c.onAccent} />
+            ) : (
+              <Text style={styles.photoBtnText}>
+                {profile.avatarFile ? "Change photo" : "Upload photo"}
+              </Text>
+            )}
+          </Pressable>
+
+          {profile.avatarFile ? (
+            <Pressable
+              style={styles.removeBtn}
+              onPress={removePhoto}
+              accessibilityRole="button"
+            >
+              <Text style={styles.removeBtnText}>Remove</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {editingName ? (
@@ -240,11 +319,12 @@ export default function ProfileScreen() {
 
       {/* Avatar picker */}
       <View style={shared.card}>
-        <Text style={styles.sectionTitle}>Pick an avatar</Text>
+        <Text style={styles.sectionTitle}>Or pick a badge</Text>
 
         <View style={styles.avatarGrid}>
           {AVATAR_PRESETS.map((av) => {
-            const active = profile.avatar === av.id;
+            // A preset is only "active" when no custom photo is in use
+            const active = !profile.avatarFile && profile.avatar === av.id;
 
             return (
               <Pressable
@@ -252,19 +332,16 @@ export default function ProfileScreen() {
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 style={[styles.avatarItem, active && styles.avatarItemActive]}
-                onPress={() => {
-                  triggerHaptic("selection");
-                  update({ avatar: av.id });
-                }}
+                onPress={() => selectPreset(av.id)}
               >
-                <Text style={{ fontSize: 24 }}>{av.label.split(" ")[0]}</Text>
+                <Avatar avatar={av.id} size={52} highlight={active} />
                 <Text
                   style={[
                     styles.avatarLabel,
                     active && { color: c.accentText },
                   ]}
                 >
-                  {av.label.split(" ")[1]}
+                  {av.label}
                 </Text>
               </Pressable>
             );
@@ -293,16 +370,24 @@ const makeStyles = (c: Palette) =>
 
     hero: { alignItems: "center", gap: 10, paddingVertical: 24 },
 
-    bigAvatar: {
-      width: 84,
-      height: 84,
-      borderRadius: 42,
-      borderWidth: 2,
-      borderColor: c.accent,
+    photoRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+    photoBtn: {
+      backgroundColor: c.accent,
+      borderRadius: 12,
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      minWidth: 130,
       alignItems: "center",
-      justifyContent: "center",
     },
-    bigAvatarEmoji: { fontSize: 42 },
+    photoBtnText: { color: c.onAccent, fontSize: 13, fontWeight: "800" },
+    removeBtn: {
+      borderRadius: 12,
+      borderWidth: 1.5,
+      borderColor: c.border,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+    },
+    removeBtnText: { color: c.textMuted, fontSize: 13, fontWeight: "700" },
 
     nameRow: { flexDirection: "row", alignItems: "center", gap: 10 },
     name: { color: c.text, fontSize: 22, fontWeight: "800" },
@@ -385,9 +470,9 @@ const makeStyles = (c: Palette) =>
     avatarItem: {
       width: "22%",
       flexGrow: 1,
-      minWidth: 68,
+      minWidth: 74,
       maxWidth: 110,
-      aspectRatio: 1,
+      paddingVertical: 10,
       backgroundColor: c.bg,
       borderRadius: 14,
       borderWidth: 1.5,
@@ -400,6 +485,6 @@ const makeStyles = (c: Palette) =>
       color: c.textMuted,
       fontSize: 11,
       fontWeight: "600",
-      marginTop: 2,
+      marginTop: 6,
     },
   });

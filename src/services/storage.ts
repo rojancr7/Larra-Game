@@ -89,43 +89,43 @@ export const AVATAR_PRESETS: readonly AvatarPreset[] = [
     id: "queen",
     label: "Queen",
     color: "#f472b6",
-    image: require("../../assets/avatar/king.jpg"),
+    image: require("../../assets/avatar/queen.jpg"),
   },
   {
     id: "ace",
     label: "Ace",
     color: "#60a5fa",
-    image: require("../../assets/avatar/king.jpg"),
+    image: require("../../assets/avatar/ace.jpg"),
   },
   {
     id: "tiger",
     label: "Tiger",
     color: "#fb923c",
-    image: require("../../assets/avatar/king.jpg"),
+    image: require("../../assets/avatar/tiger.jpg"),
   },
   {
     id: "lion",
     label: "Lion",
     color: "#facc15",
-    image: require("../../assets/avatar/king.jpg"),
+    image: require("../../assets/avatar/lion.jpg"),
   },
   {
     id: "eagle",
     label: "Eagle",
     color: "#a78bfa",
-    image: require("../../assets/avatar/king.jpg"),
+    image: require("../../assets/avatar/edgle.jpg"), // filename has typo on disk
   },
   {
     id: "wolf",
     label: "Wolf",
     color: "#94a3b8",
-    image: require("../../assets/avatar/king.jpg"),
+    image: require("../../assets/avatar/wolf.jpg"),
   },
   {
     id: "dragon",
     label: "Dragon",
     color: "#ef4444",
-    image: require("../../assets/avatar/king.jpg"),
+    image: require("../../assets/avatar/dragon.jpg"),
   },
 ];
 
