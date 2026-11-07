@@ -3,16 +3,16 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Avatar from "../components/Avatar";
 import { triggerHaptic } from "../services/audioHaptics";
 import {
-  AVATAR_PRESETS,
   DEFAULT_PROFILE,
   loadProfile,
   PlayerProfile,
 } from "../services/storage";
 import { C, serif } from "../theme/appTheme";
 
-// Logo lives at <project root>/assets/logo.jpg
+// Logo lives at <project root>/assets/images/logo.jpg
 const LOGO = require("../../assets/images/logo.jpg");
 
 export function TopBar() {
@@ -20,7 +20,7 @@ export function TopBar() {
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<PlayerProfile>(DEFAULT_PROFILE);
 
-  // Reload whenever a tab gains focus so stats update after a match
+  // Reload whenever a tab gains focus so stats and avatar update
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -30,9 +30,6 @@ export function TopBar() {
       };
     }, []),
   );
-
-  const avatar =
-    AVATAR_PRESETS.find((a) => a.id === profile.avatar) || AVATAR_PRESETS[0];
 
   return (
     <View style={[styles.bar, { paddingTop: insets.top + 10 }]}>
@@ -49,7 +46,7 @@ export function TopBar() {
           <View style={styles.brandRow}>
             <Text style={styles.brandName}>LARRA</Text>
             <View style={styles.pill}>
-              <Text style={styles.pillText}>4-Player</Text>
+              <Text style={styles.pillText}>pro</Text>
             </View>
           </View>
           <Text style={styles.tagline}>Tactical Partition Card Arena</Text>
@@ -71,9 +68,13 @@ export function TopBar() {
             triggerHaptic("selection");
             router.navigate("/profile" as any);
           }}
-          style={[styles.avatar, { backgroundColor: avatar.color + "33" }]}
+          style={styles.avatarWrap}
         >
-          <Text style={styles.avatarEmoji}>{avatar.label.split(" ")[0]}</Text>
+          <Avatar
+            avatar={profile.avatar}
+            avatarFile={profile.avatarFile}
+            size={36}
+          />
           <View style={styles.online} />
         </Pressable>
       </View>
@@ -131,17 +132,11 @@ const styles = StyleSheet.create({
   },
   statIcon: { fontSize: 11 },
   statText: { color: C.text, fontSize: 12, fontWeight: "800" },
-  avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 2,
-    borderColor: C.amber,
-    alignItems: "center",
-    justifyContent: "center",
+  avatarWrap: {
+    width: 36,
+    height: 36,
     marginLeft: 2,
   },
-  avatarEmoji: { fontSize: 17 },
   online: {
     position: "absolute",
     right: -2,
