@@ -1,21 +1,22 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DEFAULT_THEME_ID, ThemeId } from '../constants/themeManifest';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { ImageSourcePropType } from "react-native";
+import { DEFAULT_THEME_ID, ThemeId } from "../constants/themeManifest";
 
 // ---------------------------------------------------------------------------
 // 1. SETTINGS TYPES & DEFAULTS
 // ---------------------------------------------------------------------------
 
-export type GameTheme = 'casino' | 'minimal' | 'regal';
+export type GameTheme = "casino" | "minimal" | "regal";
 // Legacy aliases for old code – board and card back now share a theme ID
 export type BoardColor = ThemeId;
 export type CardBackColor = ThemeId;
-export type AIDifficulty = 'easy' | 'med' | 'hard';
-export type SpreadSpeed = 'slow' | 'medium' | 'fast' | 'instant';
-export type MusicTrackId = 'none' | 'sound1' | 'sound2';
+export type AIDifficulty = "easy" | "med" | "hard";
+export type SpreadSpeed = "slow" | "medium" | "fast" | "instant";
+export type MusicTrackId = "none" | "sound1" | "sound2";
 
 export interface GameSettings {
   themeId: ThemeId;
-  cardFace: 'classic' | 'modern';
+  cardFace: "classic" | "modern";
   playerName: string;
   soundEffects: boolean;
   musicEnabled: boolean;
@@ -32,15 +33,15 @@ export interface GameSettings {
 
 export const DEFAULT_SETTINGS: GameSettings = {
   themeId: DEFAULT_THEME_ID,
-  cardFace: 'classic',
-  playerName: 'Player 1',
+  cardFace: "classic",
+  playerName: "Player 1",
   soundEffects: true,
   musicEnabled: true,
-  musicTrack: 'sound1',
+  musicTrack: "sound1",
   vibration: true,
   animations: true,
-  difficulty: 'easy',
-  spreadSpeed: 'medium',
+  difficulty: "easy",
+  spreadSpeed: "medium",
   spreadSound: true,
   cardMoveSound: true,
 };
@@ -52,7 +53,15 @@ export const DEFAULT_SETTINGS: GameSettings = {
 export interface PlayerProfile {
   playerId: string;
   name: string;
-  avatar: string; // Avatar icon/preset id (e.g. 'king', 'queen', 'ace', 'tiger', 'lion', 'eagle')
+  /** Preset id (e.g. 'king'). Used when no custom photo is set. */
+  avatar: string;
+  /**
+   * File NAME (not full path) of a custom photo stored on this device,
+   * e.g. 'avatar_1718000000000.jpg'. Full path is rebuilt at render time
+   * (see utils/avatarStorage.ts) because iOS changes the app container
+   * path between updates.
+   */
+  avatarFile?: string;
   matchesPlayed: number;
   matchesWon: number;
   totalPoints: number;
@@ -61,20 +70,72 @@ export interface PlayerProfile {
   createdAt: number;
 }
 
-export const AVATAR_PRESETS = [
-  { id: 'king', label: '👑 King', color: '#fbbf24' },
-  { id: 'queen', label: '👸 Queen', color: '#f472b6' },
-  { id: 'ace', label: '🃏 Ace', color: '#60a5fa' },
-  { id: 'tiger', label: '🐯 Tiger', color: '#fb923c' },
-  { id: 'lion', label: '🦁 Lion', color: '#facc15' },
-  { id: 'eagle', label: '🦅 Eagle', color: '#a78bfa' },
-  { id: 'wolf', label: '🐺 Wolf', color: '#94a3b8' },
-  { id: 'dragon', label: '🐉 Dragon', color: '#ef4444' },
-] as const;
+export interface AvatarPreset {
+  id: string;
+  label: string; // plain text, no emoji
+  color: string; // ring / glow color
+  image: ImageSourcePropType;
+}
+
+// require() needs static paths in React Native, so each one is explicit.
+export const AVATAR_PRESETS: readonly AvatarPreset[] = [
+  {
+    id: "king",
+    label: "King",
+    color: "#fbbf24",
+    image: require("../../assets/avatar/king.jpg"),
+  },
+  {
+    id: "queen",
+    label: "Queen",
+    color: "#f472b6",
+    image: require("../../assets/avatar/king.jpg"),
+  },
+  {
+    id: "ace",
+    label: "Ace",
+    color: "#60a5fa",
+    image: require("../../assets/avatar/king.jpg"),
+  },
+  {
+    id: "tiger",
+    label: "Tiger",
+    color: "#fb923c",
+    image: require("../../assets/avatar/king.jpg"),
+  },
+  {
+    id: "lion",
+    label: "Lion",
+    color: "#facc15",
+    image: require("../../assets/avatar/king.jpg"),
+  },
+  {
+    id: "eagle",
+    label: "Eagle",
+    color: "#a78bfa",
+    image: require("../../assets/avatar/king.jpg"),
+  },
+  {
+    id: "wolf",
+    label: "Wolf",
+    color: "#94a3b8",
+    image: require("../../assets/avatar/king.jpg"),
+  },
+  {
+    id: "dragon",
+    label: "Dragon",
+    color: "#ef4444",
+    image: require("../../assets/avatar/king.jpg"),
+  },
+];
+
+export function getAvatarPreset(id: string): AvatarPreset {
+  return AVATAR_PRESETS.find((a) => a.id === id) ?? AVATAR_PRESETS[0];
+}
 
 export function generatePlayerId(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = 'LARRA-';
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "LARRA-";
   for (let i = 0; i < 6; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
@@ -82,9 +143,10 @@ export function generatePlayerId(): string {
 }
 
 export const DEFAULT_PROFILE: PlayerProfile = {
-  playerId: 'LARRA-USER01',
-  name: 'Player 1',
-  avatar: 'king',
+  playerId: "LARRA-USER01",
+  name: "Player 1",
+  avatar: "king",
+  avatarFile: undefined,
   matchesPlayed: 0,
   matchesWon: 0,
   totalPoints: 0,
@@ -101,7 +163,7 @@ export interface HistoryRoundResult {
   round: number;
   winnerIndex: number | null;
   winnerName: string;
-  outcome: 'WIN' | 'FIRE';
+  outcome: "WIN" | "FIRE";
   points: number;
 }
 
@@ -135,9 +197,9 @@ export const MAX_HISTORY_ITEMS = 20;
 // ---------------------------------------------------------------------------
 
 const STORAGE_KEYS = {
-  SETTINGS: '@larra_game_settings_v1',
-  PROFILE: '@larra_game_profile_v1',
-  HISTORY: '@larra_game_history_v1',
+  SETTINGS: "@larra_game_settings_v1",
+  PROFILE: "@larra_game_profile_v1",
+  HISTORY: "@larra_game_history_v1",
 };
 
 // ---------------------------------------------------------------------------
@@ -152,7 +214,7 @@ export async function loadSettings(): Promise<GameSettings> {
     const parsed = JSON.parse(raw);
     return { ...DEFAULT_SETTINGS, ...parsed };
   } catch (err) {
-    console.warn('Failed to load settings from storage:', err);
+    console.warn("Failed to load settings from storage:", err);
     return DEFAULT_SETTINGS;
   }
 }
@@ -161,7 +223,7 @@ export async function saveSettings(settings: GameSettings): Promise<void> {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   } catch (err) {
-    console.warn('Failed to save settings to storage:', err);
+    console.warn("Failed to save settings to storage:", err);
   }
 }
 
@@ -169,7 +231,7 @@ export async function resetSettings(): Promise<GameSettings> {
   try {
     await AsyncStorage.removeItem(STORAGE_KEYS.SETTINGS);
   } catch (err) {
-    console.warn('Failed to reset settings in storage:', err);
+    console.warn("Failed to reset settings in storage:", err);
   }
   return DEFAULT_SETTINGS;
 }
@@ -190,7 +252,7 @@ export async function loadProfile(): Promise<PlayerProfile> {
     const parsed = JSON.parse(raw);
     return { ...DEFAULT_PROFILE, ...parsed };
   } catch (err) {
-    console.warn('Failed to load profile from storage:', err);
+    console.warn("Failed to load profile from storage:", err);
     return DEFAULT_PROFILE;
   }
 }
@@ -199,7 +261,7 @@ export async function saveProfile(profile: PlayerProfile): Promise<void> {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
   } catch (err) {
-    console.warn('Failed to save profile to storage:', err);
+    console.warn("Failed to save profile to storage:", err);
   }
 }
 
@@ -216,7 +278,8 @@ export async function updateProfileStats(stats: {
     matchesWon: current.matchesWon + (stats.isWin ? 1 : 0),
     totalPoints: current.totalPoints + stats.pointsScored,
     cleanSweeps: current.cleanSweeps + (stats.hadCleanSweep ? 1 : 0),
-    instantVictories: current.instantVictories + (stats.hadInstantVictory ? 1 : 0),
+    instantVictories:
+      current.instantVictories + (stats.hadInstantVictory ? 1 : 0),
   };
   await saveProfile(updated);
   return updated;
@@ -231,7 +294,7 @@ export async function loadHistory(): Promise<MatchHistoryItem[]> {
     if (!Array.isArray(list)) return [];
     return list;
   } catch (err) {
-    console.warn('Failed to load history from storage:', err);
+    console.warn("Failed to load history from storage:", err);
     return [];
   }
 }
@@ -247,14 +310,12 @@ export async function saveMatchToHistory(
 ): Promise<MatchHistoryItem[]> {
   try {
     const current = await loadHistory();
-    // Prepend newest match to head
     const updated = [match, ...current];
-    // Keep only the newest 20 matches (FIFO)
     const trimmed = updated.slice(0, MAX_HISTORY_ITEMS);
     await AsyncStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(trimmed));
     return trimmed;
   } catch (err) {
-    console.warn('Failed to save match to history:', err);
+    console.warn("Failed to save match to history:", err);
     return [];
   }
 }
@@ -263,7 +324,6 @@ export async function clearHistory(): Promise<void> {
   try {
     await AsyncStorage.removeItem(STORAGE_KEYS.HISTORY);
   } catch (err) {
-    console.warn('Failed to clear history in storage:', err);
+    console.warn("Failed to clear history in storage:", err);
   }
 }
-

@@ -1,55 +1,91 @@
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { colors } from "../constants/theme";
+import { getAvatarPreset } from "../services/storage";
+import { avatarFileToUri } from "../utils/avatarStorage";
 
 interface AvatarProps {
-  emoji: string;
+  /** Preset id: 'king' | 'queen' | 'ace' | 'tiger' | 'lion' | 'eagle' | 'wolf' | 'dragon' */
+  avatar?: string;
+  /** File name of a custom photo saved on this device (profile.avatarFile) */
+  avatarFile?: string;
+  /** Legacy: only used if no `avatar` and no `avatarFile` is given */
+  emoji?: string;
+  /** Overrides the preset color used for the background tint */
   color?: string;
-  name: string;
+  /** Name pill under the avatar. Leave empty to hide it. */
+  name?: string;
   size?: number;
+  /** Green/yellow status dot. Leave undefined to hide it. */
   ready?: boolean;
   highlight?: boolean;
 }
 
 /** Circular gold ring avatar with a name pill overlapping its bottom edge. */
 export const Avatar: React.FC<AvatarProps> = ({
+  avatar,
+  avatarFile,
   emoji,
-  color = "#64748b",
+  color,
   name,
   size = 52,
   ready,
   highlight,
-}) => (
-  <View style={styles.wrap}>
-    <View
-      style={[
-        styles.ring,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: color + "44",
-          shadowOpacity: highlight ? 0.9 : 0.4,
-        },
-      ]}
-    >
-      <Text style={{ fontSize: size * 0.5 }}>{emoji}</Text>
-      {ready !== undefined && (
-        <View
-          style={[
-            styles.dot,
-            { backgroundColor: ready ? "#22c55e" : "#eab308" },
-          ]}
-        />
+}) => {
+  const [customFailed, setCustomFailed] = useState(false);
+  useEffect(() => setCustomFailed(false), [avatarFile]);
+
+  const customUri = avatarFileToUri(avatarFile);
+  const useEmojiFallback = !avatar && !customUri && !!emoji;
+  const preset = getAvatarPreset(avatar ?? "king");
+  const tint = color ?? preset.color;
+
+  // Custom photo first, then preset image. Bad/missing photo falls back to preset.
+  const source = customUri && !customFailed ? { uri: customUri } : preset.image;
+
+  return (
+    <View style={styles.wrap}>
+      <View
+        style={[
+          styles.ring,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: tint + "44",
+            shadowOpacity: highlight ? 0.9 : 0.4,
+          },
+        ]}
+      >
+        {useEmojiFallback ? (
+          <Text style={{ fontSize: size * 0.5 }}>{emoji}</Text>
+        ) : (
+          <Image
+            source={source}
+            onError={() => setCustomFailed(true)}
+            style={styles.image}
+            resizeMode="cover"
+          />
+        )}
+        {ready !== undefined && (
+          <View
+            style={[
+              styles.dot,
+              { backgroundColor: ready ? "#22c55e" : "#eab308" },
+            ]}
+          />
+        )}
+      </View>
+      {!!name && (
+        <View style={[styles.pill, { marginTop: -size * 0.2 }]}>
+          <Text style={styles.pillText} numberOfLines={1}>
+            {name}
+          </Text>
+        </View>
       )}
     </View>
-    <View style={[styles.pill, { marginTop: -size * 0.2 }]}>
-      <Text style={styles.pillText} numberOfLines={1}>
-        {name}
-      </Text>
-    </View>
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   wrap: { alignItems: "center" },
@@ -58,11 +94,13 @@ const styles = StyleSheet.create({
     borderColor: colors.goldMid,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
     shadowColor: colors.gold,
     shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
     elevation: 6,
-    backgroundColor: "#13202a",
   },
+  image: { width: "100%", height: "100%" },
   dot: {
     position: "absolute",
     right: 0,

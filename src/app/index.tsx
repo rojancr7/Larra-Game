@@ -72,12 +72,9 @@ export default function HomeScreen() {
   };
 
   const startOffline = () => {
-    triggerHaptic("selection");
-    try {
-      router.navigate(`/game?difficulty=${difficulty}` as any);
-    } catch {
-      router.push(`/game?difficulty=${difficulty}` as any);
-    }
+    triggerHaptic('selection');
+    // Navigate directly to the game screen with difficulty query param
+    router.push(`/game?difficulty=${difficulty}`);
   };
 
   const comingSoon = (title: string, body: string) => {
